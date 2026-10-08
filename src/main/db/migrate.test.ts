@@ -48,17 +48,16 @@ describe('migrate', () => {
   it('backs up an existing DB before migrating and refuses a newer schema', () => {
     const file = join(tmp(), 'lib.db')
     const db = new Database(file)
-    migrate(db, loadMigrations({ './1_a.sql': 'CREATE TABLE a(x)' }), file)
-    expect(existsSync(`${file}.bak-v0`)).toBe(false)
-    migrate(
-      db,
-      loadMigrations({ './1_a.sql': 'CREATE TABLE a(x)', './2_b.sql': 'CREATE TABLE b(x)' }),
-      file
-    )
-    expect(existsSync(`${file}.bak-v1`)).toBe(true)
-    expect(() => migrate(db, loadMigrations({ './1_a.sql': 'CREATE TABLE a(x)' }), file)).toThrow(
-      /newer/
-    )
+    try {
+      const v1 = { './1_a.sql': 'CREATE TABLE a(x)' }
+      migrate(db, loadMigrations(v1), file)
+      expect(existsSync(`${file}.bak-v0`)).toBe(false)
+      migrate(db, loadMigrations({ ...v1, './2_b.sql': 'CREATE TABLE b(x)' }), file)
+      expect(existsSync(`${file}.bak-v1`)).toBe(true)
+      expect(() => migrate(db, loadMigrations(v1), file)).toThrow(/newer/)
+    } finally {
+      db.close() // Windows cannot delete an open database file
+    }
   })
 })
 
