@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Flyout } from '../../components/Flyout'
 import { btn } from '../../components/Modal'
-import { Markdown } from './Markdown'
+import { Markdown } from './MarkdownView'
 import { parseToc, type Topic } from './toc'
 
 const HELP_URL = 'tabking://app/help/'
