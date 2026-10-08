@@ -24,6 +24,10 @@ import {
   DeletePlaylistDialog,
   PlaylistNameDialog
 } from './features/playlist/PlaylistDialogs'
+import { AboutDialog } from './features/about/AboutDialog'
+import { HelpFlyout } from './features/help/HelpFlyout'
+import { BackupDialog } from './features/prefs/BackupDialog'
+import { PreferencesDialog } from './features/prefs/PreferencesDialog'
 import { SongDetail } from './features/song/SongDetail'
 import { SongDialog } from './features/song/SongDialog'
 import { DeleteSongDialog, EditAlbumDialog, RenameArtistDialog } from './features/song/SmallDialogs'
@@ -55,6 +59,9 @@ type Dialog =
   | { kind: 'delete-playlist'; playlist: PlaylistRow }
   | { kind: 'add-to-playlist'; songs: Song[] }
   | { kind: 'add-songs'; playlist: PlaylistRow }
+  | { kind: 'preferences' }
+  | { kind: 'backup' }
+  | { kind: 'about' }
 
 const navFor = (main: MainView): NavId | null =>
   main.kind === 'search'
@@ -67,6 +74,7 @@ const navFor = (main: MainView): NavId | null =>
 
 export function App(): React.JSX.Element {
   const [menuOpen, setMenuOpen] = useState(false)
+  const [helpOpen, setHelpOpen] = useState(false)
   const [main, setMain] = useState<MainView>({ kind: 'home' })
   const [dialog, setDialog] = useState<Dialog | null>(null)
   const [ctx, setCtx] = useState<{ x: number; y: number; target: MenuTarget } | null>(null)
@@ -127,8 +135,14 @@ export function App(): React.JSX.Element {
   )
 
   const onAction = useCallback((action: MenuAction) => {
-    // Real dialogs/flyouts arrive in M6; stubbed here.
-    setNotice(`"${action}" is not implemented yet`)
+    if (action === 'help-contents') {
+      setMenuOpen(false)
+      setHelpOpen(true)
+    } else {
+      setDialog({
+        kind: action === 'preferences' ? 'preferences' : action === 'about' ? 'about' : 'backup'
+      })
+    }
   }, [])
 
   /** Open a song in the player, first explaining any missing files (LIB-8). Resolves to whether it opened. */
@@ -329,6 +343,8 @@ export function App(): React.JSX.Element {
           />
         </Flyout>
 
+        <HelpFlyout open={helpOpen} onClose={() => setHelpOpen(false)} />
+
         <main className="relative flex min-h-0 flex-1 overflow-y-auto">
           {playerOpened && (
             <div
@@ -461,6 +477,10 @@ export function App(): React.JSX.Element {
             }}
           />
         )}
+
+        {dialog?.kind === 'preferences' && <PreferencesDialog onClose={closeDialog} />}
+        {dialog?.kind === 'backup' && <BackupDialog onClose={closeDialog} />}
+        {dialog?.kind === 'about' && <AboutDialog onClose={closeDialog} />}
 
         {ctx && <ContextMenu x={ctx.x} y={ctx.y} items={ctxItems} onClose={closeCtx} />}
 

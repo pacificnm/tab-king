@@ -88,6 +88,9 @@ export class PlayerEngine {
   private stemUrls: ReadonlyMap<number, string> = new Map()
   private failed = new Set<Mp3SourceId>()
   private readyWaiters: (() => void)[] = []
+  private soundFontUrl: string
+  private synthDevice: string | null = null
+  private synthDeviceApplied = false
   /** Serialises everything that reconfigures playback (mode switches, practice, sources). */
   private op: Promise<void> = Promise.resolve()
   private lastPositionAt = 0
@@ -100,6 +103,7 @@ export class PlayerEngine {
     fontDirectory: string,
     soundFontUrl: string
   ) {
+    this.soundFontUrl = soundFontUrl
     const s = get()
     this.api = new AlphaTabApi(container, {
       core: { fontDirectory },
@@ -166,6 +170,24 @@ export class PlayerEngine {
     } catch (e) {
       this.fail(e)
     }
+  }
+
+  /** Play the synth through another output device (PRF-3); `null` is the system default. */
+  setOutputDevice(id: string | null): void {
+    this.synthDevice = id
+    // alphaTab creates its audio output only once the player is ready; applied again then.
+    if (!this.synthDeviceApplied) return
+    void this.api
+      .setOutputDevice(id ? { deviceId: id, label: '', isDefault: false } : null)
+      .catch((e: unknown) => console.warn('Could not switch the synth output device', e))
+  }
+
+  /** Swap the SoundFont the synth uses (PRF-3). Playback is paused while it reloads. */
+  setSoundFont(url: string): void {
+    if (url === this.soundFontUrl) return
+    this.soundFontUrl = url
+    if (get().playing || get().countingIn) this.pause()
+    this.api.loadSoundFont(url, false)
   }
 
   play(): void {
@@ -727,6 +749,10 @@ export class PlayerEngine {
     })
 
     api.playerReady.on(() => {
+      if (!this.synthDeviceApplied) {
+        this.synthDeviceApplied = true
+        if (this.synthDevice !== null) this.setOutputDevice(this.synthDevice)
+      }
       if (this.destroyed || !api.score || !api.tickCache) return
       const lookup = api.tickCache
       this.spans = api.score.masterBars.map((b) => {

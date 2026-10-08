@@ -1,4 +1,5 @@
 import type { AudioSource, Song, SyncPointRow, SynthSource } from '@shared/types'
+import { outputDeviceId, setOutputDevice } from './audio-output'
 import { flushMix } from './mix-persistence'
 import { makeQueue, seekQueue, type Queue } from './queue'
 import type { PlayerEngine } from './player-engine'
@@ -21,6 +22,7 @@ const get = usePlayerStore.getState
 export const player = {
   attach(e: PlayerEngine): void {
     engine = e
+    e.setOutputDevice(outputDeviceId())
   },
   detach(e: PlayerEngine): void {
     if (engine === e) engine = null
@@ -54,6 +56,15 @@ export const player = {
   fail(message: string): void {
     set({ status: 'error', error: message, playing: false, countingIn: false })
   },
+
+  /** Apply the audio preferences (PRF-3): output device, SoundFont, and the metronome / count-in switches. */
+  setOutputDevice(id: string | null): void {
+    setOutputDevice(id)
+    engine?.setOutputDevice(id)
+  },
+  setSoundFont: (url: string) => engine?.setSoundFont(url),
+  setMetronomeOn: (on: boolean) => engine?.setMetronome(on) ?? set({ metronomeOn: on }),
+  setCountInOn: (on: boolean) => engine?.setCountIn(on) ?? set({ countInOn: on }),
 
   togglePlay: () => engine?.togglePlay(),
   pause: () => engine?.pause(),

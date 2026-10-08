@@ -6,11 +6,20 @@ interface Props {
   side: 'left' | 'right'
   label: string
   onClose: () => void
+  /** Tailwind width class; the library menu is narrow, the help panel wider. */
+  width?: string
   children: ReactNode
 }
 
 /** Slide-in panel with backdrop, Esc/outside-click close and focus trap. */
-export function Flyout({ open, side, label, onClose, children }: Props): React.JSX.Element {
+export function Flyout({
+  open,
+  side,
+  label,
+  onClose,
+  width = 'w-72',
+  children
+}: Props): React.JSX.Element {
   const panel = useRef<HTMLElement>(null)
   useFocusTrap(panel, open, onClose)
 
@@ -31,7 +40,7 @@ export function Flyout({ open, side, label, onClose, children }: Props): React.J
         role="dialog"
         aria-label={label}
         inert={!open}
-        className={`absolute bottom-0 top-0 w-72 border-border bg-surface shadow-xl transition-transform duration-200 ${pos} ${open ? 'translate-x-0' : hidden}`}
+        className={`absolute bottom-0 top-0 max-w-full ${width} border-border bg-surface shadow-xl transition-transform duration-200 ${pos} ${open ? 'translate-x-0' : hidden}`}
       >
         {children}
       </aside>

@@ -40,7 +40,7 @@ describe('parseMediaUrl', () => {
       host: 'soundfonts',
       rel: 'My Bank.sf2'
     })
-    expect(parseMediaUrl('tabking://soundfonts/../x.sf2')).toBeNull()
+    expect(parseMediaUrl('tabking://soundfonts/..%2Fx.sf2')).toBeNull()
     expect(parseMediaUrl('tabking://evil/a')).toBeNull()
   })
 })
