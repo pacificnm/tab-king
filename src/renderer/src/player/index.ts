@@ -1,0 +1,57 @@
+import type { Song } from '@shared/types'
+import type { PlayerEngine } from './player-engine'
+import { clampSpeed, stepSpeed } from './player-math'
+import { usePlayerStore, type TabLayout } from './store'
+
+export { usePlayerStore } from './store'
+export type { PlayerState, TabLayout } from './store'
+export { formatTime } from './player-math'
+
+let engine: PlayerEngine | null = null
+const set = usePlayerStore.setState
+const get = usePlayerStore.getState
+
+/**
+ * What the UI calls to control playback. Components never import alphaTab; the engine is attached
+ * by the (lazy-loaded) tab view and every command is a no-op until it is.
+ */
+export const player = {
+  attach(e: PlayerEngine): void {
+    engine = e
+  },
+  detach(e: PlayerEngine): void {
+    if (engine === e) engine = null
+  },
+
+  /** Open a song in the player; with `autoplay` it starts as soon as it is ready. */
+  open(song: Song, autoplay = true): void {
+    set((s) => ({ song, openToken: s.openToken + 1, autoplay, status: 'loading', error: null }))
+  },
+  /** Report a load failure (e.g. missing file) so the tab view shows it instead of crashing. */
+  fail(message: string): void {
+    set({ status: 'error', error: message, playing: false, countingIn: false })
+  },
+
+  togglePlay: () => engine?.togglePlay(),
+  pause: () => engine?.pause(),
+  stop: () => engine?.stop(),
+  restart: () => engine?.restart(),
+  previous: () => engine?.previous(),
+  next: () => engine?.next(),
+  seekMs: (ms: number) => engine?.seekMs(ms),
+
+  setSpeed: (speed: number) => engine?.setSpeed(speed) ?? set({ speed: clampSpeed(speed) }),
+  stepSpeed: (dir: 1 | -1) => player.setSpeed(stepSpeed(get().speed, dir)),
+  resetSpeed: () => player.setSpeed(1),
+
+  toggleMetronome: () => engine?.setMetronome(!get().metronomeOn),
+  setMetronomeVolume: (v: number) => engine?.setMetronome(get().metronomeOn, v),
+  toggleCountIn: () => engine?.setCountIn(!get().countInOn),
+  toggleLoop: () => engine?.setLoop(!get().loopOn),
+  setRange: (start: number, end: number) => engine?.setRange(start, end),
+  clearRange: () => engine?.clearRange(),
+  setMasterVolume: (v: number) => engine?.setMasterVolume(v),
+
+  setZoom: (zoom: number) => engine?.setZoom(zoom),
+  setLayout: (layout: TabLayout) => engine?.setLayout(layout)
+}

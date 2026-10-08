@@ -1,32 +1,15 @@
-import {
-  _electron as electron,
-  expect,
-  test,
-  type ElectronApplication,
-  type Page
-} from '@playwright/test'
-import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { expect, test, type ElectronApplication, type Page } from '@playwright/test'
+import { existsSync, readdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
-import { writeGp, writeTaggedMp3 } from './fixtures'
+import { addSong, launchApp, makeTmp } from './helpers'
 
 let tmp: string
 let app: ElectronApplication
 let page: Page
 
 test.beforeEach(async () => {
-  tmp = mkdtempSync(join(tmpdir(), 'tabking-e2e-'))
-  const env = { ...process.env } as Record<string, string>
-  delete env.ELECTRON_RUN_AS_NODE
-  const userData = `--user-data-dir=${join(tmp, 'ud')}`
-  // TABKING_EXE runs the suite against a packaged build (npm run dist:dir) instead of out/main.
-  const exe = process.env.TABKING_EXE
-  app = await electron.launch(
-    exe
-      ? { executablePath: exe, args: ['--no-sandbox', userData], env }
-      : { args: ['out/main/index.js', userData], env }
-  )
-  page = await app.firstWindow()
+  tmp = makeTmp()
+  ;({ app, page } = await launchApp(tmp))
 })
 
 test.afterEach(async () => {
@@ -34,39 +17,8 @@ test.afterEach(async () => {
   rmSync(tmp, { recursive: true, force: true })
 })
 
-/** Native dialogs can't be driven by Playwright: answer the next showOpenDialog calls with these files. */
-async function queueFilePicks(...files: string[]): Promise<void> {
-  await app.evaluate(({ dialog }, queue) => {
-    dialog.showOpenDialog = (async () => ({
-      canceled: false,
-      filePaths: [queue.shift() as string]
-    })) as never
-  }, files)
-}
-
-async function addSong(): Promise<void> {
-  const gp = writeGp(tmp, 'song.gp')
-  const mp3 = writeTaggedMp3(tmp, 'master.mp3', {
-    title: 'YYZ',
-    artist: 'Rush',
-    album: 'Moving Pictures'
-  })
-  await queueFilePicks(gp, mp3)
-  await page.getByRole('button', { name: 'Add song…' }).click()
-  const dialog = page.getByRole('dialog', { name: 'Add song' })
-  await dialog.getByRole('button', { name: 'Choose…' }).first().click()
-  await expect(dialog.getByLabel('Title')).toHaveValue('GP Title') // prefilled from the GP file
-  await expect(dialog.getByText('1. Lead')).toBeVisible()
-  await dialog.getByRole('button', { name: 'Choose…' }).first().click() // master MP3 (GP row now says Replace…)
-  await expect(dialog.getByLabel('Title')).toHaveValue('YYZ') // ID3 overrides GP
-  await expect(dialog.getByLabel('Artist')).toHaveValue('Rush')
-  await expect(dialog.getByLabel('Album')).toHaveValue('Moving Pictures')
-  await dialog.getByRole('button', { name: 'Add song' }).click()
-  await expect(page.getByRole('article', { name: 'YYZ' })).toBeVisible()
-}
-
 test('adds a song with GP + MP3 and shows it under Artist → Album → Song with cover art', async () => {
-  await addSong()
+  await addSong(app, page, tmp)
 
   await page.getByRole('button', { name: 'Library menu' }).click()
   const tree = page.getByRole('tree', { name: 'Library' })
@@ -90,7 +42,7 @@ test('adds a song with GP + MP3 and shows it under Artist → Album → Song wit
 })
 
 test('context menu offers Add, Edit, Play and delete removes the song and its files', async () => {
-  await addSong()
+  await addSong(app, page, tmp)
   await page.getByRole('button', { name: 'Library menu' }).click()
   const tree = page.getByRole('tree', { name: 'Library' })
   await tree.getByRole('treeitem', { name: 'Artists' }).click()
@@ -112,7 +64,7 @@ test('context menu offers Add, Edit, Play and delete removes the song and its fi
 })
 
 test('a song with a missing file is reported, not fatal', async () => {
-  await addSong()
+  await addSong(app, page, tmp)
   rmSync(join(tmp, 'ud', 'library', 'Rush', 'Moving Pictures', 'YYZ', 'master.mp3'))
   await page.getByRole('button', { name: 'Library menu' }).click()
   const tree = page.getByRole('tree', { name: 'Library' })
@@ -121,6 +73,8 @@ test('a song with a missing file is reported, not fatal', async () => {
   await tree.getByRole('treeitem', { name: /Moving Pictures/ }).click()
   await tree.getByRole('treeitem', { name: 'YYZ' }).click()
   await expect(page.getByRole('alert').filter({ hasText: '1 file is missing' })).toBeVisible()
-  await page.getByRole('button', { name: 'Play', exact: true }).click()
-  await expect(page.getByRole('status')).toContainText('missing Master MP3')
+  // a missing MP3 doesn't stop the tab from playing, but a missing Guitar Pro file does
+  rmSync(join(tmp, 'ud', 'library', 'Rush', 'Moving Pictures', 'YYZ', 'song.gp'))
+  await page.getByRole('article').getByRole('button', { name: 'Play', exact: true }).click()
+  await expect(page.getByRole('status')).toContainText('missing Guitar Pro file')
 })

@@ -1,0 +1,27 @@
+Tab King
+Copyright 2026 Jaimie Garner
+Licensed under the Apache License, Version 2.0.
+
+This product bundles or depends on the following third-party works. Full license
+texts ship with each package or are linked below. (A complete audit is part of M7.)
+
+Bundled assets
+--------------
+SoundFont: Sonivox EAS GM bank (resources/soundfont/sonivox.sf3)
+  Copyright (c) 2004-2006 Sonic Network Inc. Licensed under the Apache License 2.0.
+  Distributed via the alphaTab project; see resources/soundfont/LICENSE and README.md.
+
+Bravura music font (resources/font/)
+  Copyright (c) 2015 Steinberg Media Technologies GmbH. SIL Open Font License 1.1
+  (https://scripts.sil.org/OFL).
+
+Libraries
+---------
+alphaTab (@coderline/alphatab)   MPL-2.0   https://github.com/CoderLine/alphaTab
+Electron                          MIT
+React, react-dom                  MIT
+zustand                           MIT
+react-window                      MIT
+better-sqlite3                    MIT
+music-metadata                    MIT
+zod                               MIT

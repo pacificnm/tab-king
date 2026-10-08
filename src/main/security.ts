@@ -6,7 +6,7 @@ const PROD_CSP = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: tabking:",
   "media-src 'self' blob: tabking:",
-  "font-src 'self' data:",
+  "font-src 'self' data: tabking:",
   "connect-src 'self' tabking:",
   "worker-src 'self' blob:",
   "object-src 'none'",

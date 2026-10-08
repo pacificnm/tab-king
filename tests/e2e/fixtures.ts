@@ -12,7 +12,9 @@ export function writeGp(dir: string, name: string): string {
   const settings = new Settings()
   const imp = new importer.AlphaTexImporter()
   imp.initFromString(
-    '\\title "GP Title" \\artist "GP Artist" \\album "GP Album" \\track "Lead" 3.3.4*4 | 1.2.4*4 \\track "Bass" 1.3.1*4',
+    '\\title "GP Title" \\artist "GP Artist" \\album "GP Album" \\tempo 120 \\track "Lead" ' +
+      Array.from({ length: 8 }, () => '3.3.4*4').join(' | ') +
+      ' \\track "Bass" 1.3.1*4',
     settings
   )
   const file = join(dir, name)

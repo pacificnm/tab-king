@@ -21,6 +21,19 @@ export function sanitizeSegment(name: string, fallback = 'Unknown'): string {
   return s
 }
 
+/** Resolve a relative POSIX path under `root`; throws if it is empty, has dot/empty segments or escapes. */
+export function resolveWithin(root: string, rel: string): string {
+  const segs = rel.split('/')
+  if (segs.some((s) => s === '' || s === '.' || s === '..' || s.includes('\\'))) {
+    throw new Error('Path outside library')
+  }
+  const abs = resolve(root, ...segs)
+  const back = relative(root, abs)
+  if (back === '' || back.startsWith('..') || resolve(back) === back)
+    throw new Error('Path outside library')
+  return abs
+}
+
 /** Managed library folder: all song files live under `root`; callers deal in relative POSIX paths. */
 export class LibraryStore {
   constructor(readonly root: string) {
@@ -29,16 +42,7 @@ export class LibraryStore {
 
   /** Absolute path for a relative one; throws if it would escape the library folder. */
   resolve(rel: string): string {
-    const segs = rel.split('/')
-    if (segs.some((s) => s === '' || s === '.' || s === '..' || s.includes('\\'))) {
-      throw new Error('Path outside library')
-    }
-    const abs = resolve(this.root, ...segs)
-    const back = relative(this.root, abs)
-    if (!rel || back === '' || back.startsWith('..') || resolve(back) === back) {
-      throw new Error('Path outside library')
-    }
-    return abs
+    return resolveWithin(this.root, rel)
   }
 
   exists(rel: string): boolean {
