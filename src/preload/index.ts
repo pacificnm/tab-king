@@ -16,6 +16,26 @@ const api: TabKingApi = {
   },
   app: {
     getInfo: () => ipcRenderer.invoke(IPC.appGetInfo)
+  },
+  library: {
+    listArtists: () => ipcRenderer.invoke(IPC.libListArtists),
+    listAlbums: (artistId) => ipcRenderer.invoke(IPC.libListAlbums, artistId),
+    listSongs: (artistId, albumId) => ipcRenderer.invoke(IPC.libListSongs, artistId, albumId),
+    getSong: (id) => ipcRenderer.invoke(IPC.libGetSong, id),
+    pickFiles: (kind) => ipcRenderer.invoke(IPC.libPickFiles, kind),
+    readPicked: (token) => ipcRenderer.invoke(IPC.libReadPicked, token),
+    readId3: (token) => ipcRenderer.invoke(IPC.libReadId3, token),
+    addSong: (form) => ipcRenderer.invoke(IPC.libAddSong, form),
+    updateSong: (id, form) => ipcRenderer.invoke(IPC.libUpdateSong, id, form),
+    deleteSong: (id, deleteFiles) => ipcRenderer.invoke(IPC.libDeleteSong, id, deleteFiles),
+    renameArtist: (id, name) => ipcRenderer.invoke(IPC.libRenameArtist, id, name),
+    updateAlbum: (id, title, year) => ipcRenderer.invoke(IPC.libUpdateAlbum, id, title, year),
+    checkSong: (id) => ipcRenderer.invoke(IPC.libCheckSong, id),
+    onChanged: (cb) => {
+      const listener = (): void => cb()
+      ipcRenderer.on(IPC.libChanged, listener)
+      return () => ipcRenderer.removeListener(IPC.libChanged, listener)
+    }
   }
 }
 

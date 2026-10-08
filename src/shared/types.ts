@@ -63,3 +63,69 @@ export interface SongInput {
   durationMs?: number | null
   tracks?: SongTrack[]
 }
+
+/** User-facing outcome of an operation that can fail for reasons the UI should explain (LIB-8). */
+export type Result<T> = { ok: true; value: T } | { ok: false; error: string }
+
+export type PickKind = 'gp' | 'midi' | 'mp3' | 'mp3-multi'
+
+/** A file the user chose in the native picker. The renderer only ever holds an opaque token, not a path. */
+export interface PickedFile {
+  token: string
+  name: string
+}
+
+export interface Id3Info {
+  title: string | null
+  artist: string | null
+  album: string | null
+  year: number | null
+  trackNo: number | null
+  genre: string | null
+  durationMs: number | null
+  /** Embedded cover art as a data URL for preview, if present. */
+  coverDataUrl: string | null
+}
+
+/** Where a song's file slot gets its content on save. */
+export type FileRef = { existing: string } | { token: string } | null
+
+export type CoverChoice = 'keep' | 'id3' | 'none'
+
+export interface TrackForm {
+  trackIndex: number
+  name: string
+  instrument: string | null
+  mp3: FileRef
+  source: AudioSource
+  volume: number
+}
+
+/** What the Add/Edit dialog submits. */
+export interface SongForm {
+  artist: string
+  album: string | null
+  title: string
+  trackNo: number | null
+  genre: string | null
+  year: number | null
+  durationMs: number | null
+  gp: FileRef
+  midi: FileRef
+  masterMp3: FileRef
+  masterSource: AudioSource
+  syncOffsetMs: number
+  tracks: TrackForm[]
+  cover: CoverChoice
+}
+
+export interface FileCheck {
+  path: string
+  label: string
+  exists: boolean
+}
+
+/** Build the media URL for a library-relative path. */
+export function libraryUrl(relPath: string): string {
+  return `tabking://library/${relPath.split('/').map(encodeURIComponent).join('/')}`
+}

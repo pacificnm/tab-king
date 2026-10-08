@@ -204,6 +204,25 @@ export class LibraryRepo {
     })()
   }
 
+  /** Rename/re-year an album. Throws if the artist already has another album with that title. */
+  updateAlbum(id: number, title: string, year: number | null): void {
+    const clash = this.db
+      .prepare(
+        'SELECT 1 FROM album WHERE title = ? AND id != ? AND artist_id = (SELECT artist_id FROM album WHERE id = ?)'
+      )
+      .get(title, id, id)
+    if (clash) throw new Error('This artist already has an album with that title')
+    this.db.prepare('UPDATE album SET title = ?, year = ? WHERE id = ?').run(title, year, id)
+  }
+
+  clearAlbumCover(albumId: number): void {
+    this.db.prepare('UPDATE album SET cover_path = NULL WHERE id = ?').run(albumId)
+  }
+
+  albumExists(id: number): boolean {
+    return !!this.db.prepare('SELECT 1 FROM album WHERE id = ?').get(id)
+  }
+
   getSetting<T>(key: string): T | undefined {
     const row = this.db.prepare('SELECT value FROM settings WHERE key = ?').get(key) as
       { value: string } | undefined
