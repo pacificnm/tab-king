@@ -3,6 +3,8 @@ import { is } from '@electron-toolkit/utils'
 import { join } from 'node:path'
 import { openDatabase } from './db/connection'
 import { LibraryRepo } from './db/repo/library-repo'
+import { PlaylistRepo } from './db/repo/playlist-repo'
+import { SearchRepo } from './db/repo/search-repo'
 import { registerIpc } from './ipc'
 import { registerLibraryIpc } from './library/ipc'
 import { PickedFiles } from './library/picked-files'
@@ -25,12 +27,19 @@ if (!app.requestSingleInstanceLock()) {
     installCsp(is.dev)
     denyPermissions()
     registerIpc()
-    const repo = new LibraryRepo(openDatabase(join(app.getPath('userData'), 'library.db')))
+    const db = openDatabase(join(app.getPath('userData'), 'library.db'))
+    const repo = new LibraryRepo(db)
     const store = new LibraryStore(join(app.getPath('userData'), 'library'))
     const picked = new PickedFiles()
     // out/main/index.js -> ../../resources (same layout in dev, e2e and inside app.asar)
     registerLibraryProtocol(store, join(__dirname, '../../resources'))
-    registerLibraryIpc({ repo, service: new SongService(repo, store, picked), picked })
+    registerLibraryIpc({
+      repo,
+      searchRepo: new SearchRepo(db, repo),
+      playlists: new PlaylistRepo(db, repo),
+      service: new SongService(repo, store, picked),
+      picked
+    })
     const settings = new SettingsStore()
     createMainWindow(settings)
 

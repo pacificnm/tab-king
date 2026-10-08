@@ -6,7 +6,9 @@ import type {
   Id3Info,
   PickedFile,
   PickKind,
+  PlaylistRow,
   Result,
+  SearchResults,
   Song,
   SongForm,
   SongMix,
@@ -111,6 +113,25 @@ export interface TabKingApi {
     /** Songs of an album, or the artist's album-less songs when `albumId` is null. */
     listSongs(artistId: number, albumId: number | null): Promise<Song[]>
     getSong(id: number): Promise<Song | null>
+    /** All of an artist's songs, by album then track. */
+    listSongsByArtist(artistId: number): Promise<Song[]>
+    /** Full-text search over songs, plus matching albums and artists (NAV-4). */
+    search(text: string): Promise<SearchResults>
+    listFavorites(): Promise<Song[]>
+    /** Returns the new state. */
+    setFavorite(songId: number, favorite: boolean): Promise<Result<boolean>>
+    playlists: {
+      list(): Promise<PlaylistRow[]>
+      create(name: string): Promise<Result<PlaylistRow>>
+      rename(id: number, name: string): Promise<Result<null>>
+      delete(id: number): Promise<Result<null>>
+      songs(id: number): Promise<Song[]>
+      /** Appends; resolves to how many were added (songs already in the playlist are skipped). */
+      add(id: number, songIds: number[]): Promise<Result<number>>
+      remove(id: number, songId: number): Promise<Result<null>>
+      /** `songIds` must be exactly the playlist's current songs, in the new order. */
+      reorder(id: number, songIds: number[]): Promise<Result<null>>
+    }
     /** Opens the native file picker; resolves to [] if cancelled. */
     pickFiles(kind: PickKind): Promise<PickedFile[]>
     readPicked(token: string): Promise<Result<ArrayBuffer>>

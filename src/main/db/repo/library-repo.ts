@@ -27,6 +27,7 @@ interface SongDbRow {
   synth_source: 'gp' | 'midi'
   sync_offset_ms: number
   duration_ms: number | null
+  favorite: number
 }
 
 interface TrackDbRow {
@@ -41,7 +42,8 @@ interface TrackDbRow {
 }
 
 const SONG_SELECT = `
-  SELECT s.*, ar.name AS artist_name, al.title AS album_title, al.cover_path AS cover_path
+  SELECT s.*, ar.name AS artist_name, al.title AS album_title, al.cover_path AS cover_path,
+         EXISTS (SELECT 1 FROM favorite f WHERE f.song_id = s.id) AS favorite
   FROM song s
   JOIN artist ar ON ar.id = s.artist_id
   LEFT JOIN album al ON al.id = s.album_id`
@@ -98,6 +100,56 @@ export class LibraryRepo {
             .all(albumId)
     ) as SongDbRow[]
     return rows.map((r) => this.toSong(r))
+  }
+
+  /** All of an artist's songs: by album (year, then track), album-less songs last. */
+  listSongsByArtist(artistId: number): Song[] {
+    const rows = this.db
+      .prepare(
+        `${SONG_SELECT} WHERE s.artist_id = ?
+         ORDER BY al.id IS NULL, al.year IS NULL, al.year, al.title COLLATE NOCASE,
+                  s.track_no IS NULL, s.track_no, s.title COLLATE NOCASE`
+      )
+      .all(artistId) as SongDbRow[]
+    return rows.map((r) => this.toSong(r))
+  }
+
+  /** Songs by id, in the order given; unknown ids are skipped. */
+  getSongs(ids: readonly number[]): Song[] {
+    if (ids.length === 0) return []
+    const rows = this.db
+      .prepare(`${SONG_SELECT} WHERE s.id IN (${ids.map(() => '?').join(',')})`)
+      .all(...ids) as SongDbRow[]
+    const byId = new Map(rows.map((r) => [r.id, r]))
+    return ids.flatMap((id) => {
+      const r = byId.get(id)
+      return r ? [this.toSong(r)] : []
+    })
+  }
+
+  /** Turn query rows (selected with {@link SONG_SELECT}'s columns) into songs. */
+  songsFromRows(rows: unknown[]): Song[] {
+    return (rows as SongDbRow[]).map((r) => this.toSong(r))
+  }
+
+  /** Favorites, most recently added first (NAV-5). */
+  listFavorites(): Song[] {
+    const rows = this.db
+      .prepare(
+        `${SONG_SELECT} JOIN favorite fav ON fav.song_id = s.id ORDER BY fav.created_at DESC, s.id DESC`
+      )
+      .all() as SongDbRow[]
+    return rows.map((r) => this.toSong(r))
+  }
+
+  /** Add or remove a favorite; returns the new state. */
+  setFavorite(songId: number, favorite: boolean): boolean {
+    if (favorite) {
+      this.db.prepare('INSERT OR IGNORE INTO favorite (song_id) VALUES (?)').run(songId)
+    } else {
+      this.db.prepare('DELETE FROM favorite WHERE song_id = ?').run(songId)
+    }
+    return favorite
   }
 
   getSong(id: number): Song | undefined {
@@ -368,7 +420,8 @@ export class LibraryRepo {
         mp3Ms: number
       }[],
       durationMs: r.duration_ms,
-      tracks
+      tracks,
+      favorite: r.favorite === 1
     }
   }
 }
