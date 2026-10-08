@@ -9,19 +9,20 @@ Single-user, offline desktop app for Linux (x64, ARM64), Windows and macOS that 
 
 ## 2. Window and shell
 
-| ID    | Requirement                                                                                                                                 | P   |
-| ----- | ------------------------------------------------------------------------------------------------------------------------------------------- | --- |
-| WIN-1 | Native window decoration is disabled (frameless).                                                                                           | M   |
-| WIN-2 | Custom title bar with hamburger icon, app title, and minimize/maximize/close buttons; draggable; double-click toggles maximize.             | M   |
-| WIN-3 | Hamburger opens a **left flyout** with: **File** → Preferences, Backup/Restore; **Help** → Contents, About. Closes on outside click or Esc. | M   |
-| WIN-4 | Window size/position/maximized state persist across launches.                                                                               | S   |
-| WIN-5 | Resizing, snapping, and edge-drag work on all platforms despite frameless.                                                                  | M   |
+| ID    | Requirement                                                                                                                                                                                 | P   |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- |
+| WIN-1 | Native window decoration is disabled (frameless).                                                                                                                                           | M   |
+| WIN-2 | Custom title bar: hamburger icon (left), app title, **File / Help menu bar** immediately right of the title, and minimize/maximize/close buttons; draggable; double-click toggles maximize. | M   |
+| WIN-3 | Hamburger opens a **left flyout** containing the library navigation only (see NAV-1). Closes on outside click or Esc.                                                                       | M   |
+| WIN-6 | Title-bar menu bar: **File** → Preferences, Backup/Restore; **Help** → Help Contents, About. Drop-downs are keyboard operable (arrows, Enter, Esc) and open on click.                       | M   |
+| WIN-4 | Window size/position/maximized state persist across launches.                                                                                                                               | S   |
+| WIN-5 | Resizing, snapping, and edge-drag work on all platforms despite frameless.                                                                                                                  | M   |
 
 ## 3. Navigation and library
 
 | ID    | Requirement                                                                                                                                                                                               | P   |
 | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- |
-| NAV-1 | Main menu (sidebar) with top-level items: **Search, Play List, Favorites, Artist**.                                                                                                                       | M   |
+| NAV-1 | Hamburger flyout (library navigation) has top-level items: **Play Lists, Favorites, Artists**. (Search placement: see open question 4.)                                                                   | M   |
 | NAV-2 | Artist expands to Albums, which expand to Songs (tree).                                                                                                                                                   | M   |
 | NAV-3 | Every menu item (artist, album, song, playlist) has a right-click context menu with **Add, Edit, Play** (Delete where applicable).                                                                        | M   |
 | NAV-4 | Search matches title, artist, album and tags as you type (full-text), results grouped by type.                                                                                                            | M   |
@@ -81,7 +82,7 @@ Single-user, offline desktop app for Linux (x64, ARM64), Windows and macOS that 
 | PRF-3 | Preferences for audio: output device, default metronome/count-in state, soundfont selection.                                                                                                                    | S   |
 | BKP-1 | **Backup** produces one archive (.zip) containing the DB and all library files plus manifest/version.                                                                                                           | M   |
 | BKP-2 | **Restore** from archive after confirmation; validates manifest and schema version; rollback on failure.                                                                                                        | M   |
-| HLP-1 | Help → Contents opens a **right-side flyout** with a table of contents; selecting an entry shows that topic (bundled Markdown).                                                                                 | M   |
+| HLP-1 | Help → Help Contents opens a **right-side flyout** with a table of contents; selecting an entry shows that topic (bundled Markdown).                                                                            | M   |
 | ABT-1 | Help → About opens a **modal** with app name, version, license, links.                                                                                                                                          | M   |
 | ABT-2 | About has a **Check for updates** button that queries GitHub Releases (`pacificnm/tab-king`) and reports up-to-date or the newer version with a link. No automatic install in v1; no check without user action. | M   |
 
@@ -119,4 +120,5 @@ Folder scanning/watching, cloud sync, multi-user, tab editing/authoring, online 
 
 1. Which SoundFont to bundle (e.g. a small GM sf2/sf3 with a permissive license)? Needs a license check.
 2. Should Previous/Next in the footer move by measure, section, or song? Spec assumes measure/section, with long-press or modifier for song.
-3. Is app-level undo needed for library edits? Assumed no.
+3. Search is no longer in the hamburger flyout. Where does it live — a search box in the title bar/main area, or a keyboard-invoked panel (Ctrl+K)? NAV-4 still requires full-text search.
+4. Is app-level undo needed for library edits? Assumed no.

@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react'
+import { MenuBar, type MenuAction } from './MenuBar'
 
 interface Props {
   onMenu: () => void
   menuOpen: boolean
+  onAction: (action: MenuAction) => void
 }
 
 const btn =
   'app-no-drag inline-flex h-full w-11 items-center justify-center text-fg-muted hover:bg-surface-2 hover:text-fg'
 
-export function TitleBar({ onMenu, menuOpen }: Props): React.JSX.Element {
+export function TitleBar({ onMenu, menuOpen, onAction }: Props): React.JSX.Element {
   const [maximized, setMaximized] = useState(false)
 
   useEffect(() => {
@@ -29,8 +31,8 @@ export function TitleBar({ onMenu, menuOpen }: Props): React.JSX.Element {
       <button
         type="button"
         className={btn}
-        aria-label="Main menu"
-        aria-haspopup="menu"
+        aria-label="Library menu"
+        aria-haspopup="dialog"
         aria-expanded={menuOpen}
         onClick={onMenu}
         onDoubleClick={(e) => e.stopPropagation()}
@@ -46,9 +48,11 @@ export function TitleBar({ onMenu, menuOpen }: Props): React.JSX.Element {
           <path d="M2 4.5h14M2 9h14M2 13.5h14" strokeLinecap="round" />
         </svg>
       </button>
-      <div className="flex-1 select-none px-2 text-sm font-semibold tracking-wide">
+      <div className="select-none px-2 text-sm font-semibold tracking-wide">
         <span className="text-accent">Tab</span> King
       </div>
+      <MenuBar onSelect={onAction} />
+      <div className="flex-1" />
       <button
         type="button"
         className={btn}

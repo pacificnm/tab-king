@@ -13,7 +13,7 @@ Single-user, offline-first, open source (Apache-2.0).
 - Master MP3 plus per-instrument MP3 stems, synced to the tab via start offset and bar sync points
 - Metronome click, 3-click count-in, select-and-loop of measures/sections
 - Library built from ID3 tags (album art, artist, album, title); Search, Playlists, Favorites, Artist → Album → Song browsing
-- Frameless window with custom title bar, hamburger flyout menu, right-side help flyout
+- Frameless window with custom title bar, hamburger library-navigation flyout, File/Help menu bar, right-side help flyout
 - Themes, configurable folders, backup/restore, in-app update check against GitHub releases
 
 ## Stack

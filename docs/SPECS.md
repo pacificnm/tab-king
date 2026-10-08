@@ -41,7 +41,8 @@ docs/ tests/
 - `BrowserWindow({ frame: false, titleBarStyle: 'hidden' })`; on macOS keep `trafficLightPosition` hidden and draw our own buttons for consistency.
 - Title bar: `-webkit-app-region: drag`; interactive children `no-drag`. Buttons call `window.api.win.{minimize,toggleMaximize,close}`.
 - Resizing: frameless windows resize natively on Windows/macOS; on Linux add invisible 4 px resize handles if the WM doesn't provide them (verify per WM).
-- Left flyout: React slide-in panel (≈280 px) over content with backdrop; menu tree File/Help; focus-trapped, Esc closes.
+- Title bar order: hamburger · app title · menu bar (File, Help) · drag space · window buttons. The menu bar (`MenuBar`) is an ARIA `menubar` with drop-down `menu`s: File → Preferences, Backup / Restore; Help → Help Contents, About. Arrow keys move between items/menus, Enter activates, Esc closes; hovering another top-level item while one is open switches menus.
+- Left flyout (`Flyout` + `NavMenu`): React slide-in panel (≈280 px) over content with backdrop; contains library navigation only (Play Lists, Favorites, Artists); focus-trapped, Esc closes.
 - Right help flyout: slide-in panel with TOC list (from `resources/help/toc.json`) and rendered Markdown (react-markdown).
 - Window bounds saved to `settings` (debounced).
 
@@ -82,7 +83,7 @@ Context menus [NAV-3]: Artist → Add song, Edit artist (rename), Play all. Albu
 
 ## 5. Navigation UI [NAV-*]
 
-- Sidebar top-level: Search, Play List, Favorites, Artist. Lazy-loaded tree for Artist → Album → Song with virtualization (react-window) [NFR-3].
+- Flyout top-level: Play Lists, Favorites, Artists. Search entry point TBD (REQUIREMENTS open question 4). Lazy-loaded tree for Artist → Album → Song with virtualization (react-window) [NFR-3].
 - Search: input with 150 ms debounce → `song_fts MATCH` with prefix queries; results grouped Songs / Albums / Artists.
 - Playlists: drag-and-drop reorder; Play starts a queue.
 - Double-click a song or Play opens it in the player and sets queue context (album/playlist/search).
@@ -137,7 +138,7 @@ Dialog sections: Appearance (theme), Locations (library, backup folder), Audio (
 
 - Backup: SQLite `VACUUM INTO` temp file → zip (archiver) with `manifest.json {appVersion, schemaVersion, createdAt}`, `tabking.db`, `library/**`. Progress events to UI.
 - Restore: validate zip + manifest (schema ≤ app's), close DB, extract to temp dir, swap with the current data (kept as `.bak` until success), reopen and run migrations; on error roll back.
-- Help: `resources/help/*.md` + `toc.json`; right flyout with TOC and article view.
+- Help Contents: `resources/help/*.md` + `toc.json`; right flyout with TOC and article view.
 - About modal: name, version (`app.getVersion()`), license, repo link. **Check for updates** → main calls `GET https://api.github.com/repos/pacificnm/tab-king/releases/latest`, compares semver with `app.getVersion()`, returns `{upToDate, latest, url}`; errors shown inline. Only on click.
 
 ## 9. Licensing and third-party
@@ -197,16 +198,16 @@ SemVer in `package.json`; the phase tag table in PROJECT_PLAN gives each milesto
 
 ## 12. Milestones
 
-| M   | Deliverable                                                                                                      | Acceptance                                                                                                                          |
-| --- | ---------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| M0  | Scaffold, CI, **release pipeline (all 5 build targets)**, frameless window, title bar, left flyout, theme tokens | App launches on Linux; menu flyout works; lint/test green; tagged v0.1.0 produces a GitHub Release with installers for every target |
-| M1  | DB + migrations, library store, Add/Edit song w/ ID3, Artist tree, context menus                                 | Add a song with GP+MP3; appears under Artist→Album→Song                                                                             |
-| M2  | alphaTab render + synth playback, footer controls, metronome, count-in, loop/select, speed                       | Play a GP file; loop 4 bars at 60% with count-in                                                                                    |
-| M3  | Multi-track panel: solo/mute/volume, per-track view                                                              | Play each track separately                                                                                                          |
-| M4  | MP3 engine, offset + sync points, sync editor, stems, source selector, pitch-preserved speed                     | MP3 and cursor within 30 ms over a full song; stems switch                                                                          |
-| M5  | Search (FTS), playlists, favorites, queue                                                                        | Search finds by artist/album/title                                                                                                  |
-| M6  | Preferences, backup/restore, help flyout, about + update check                                                   | Backup→wipe→restore round trip passes                                                                                               |
-| M7  | Packaging, release workflow, polish, a11y pass                                                                   | Installers build on all 3 OSes                                                                                                      |
+| M   | Deliverable                                                                                                                                  | Acceptance                                                                                                                          |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| M0  | Scaffold, CI, **release pipeline (all 5 build targets)**, frameless window, title bar with File/Help menu bar, left nav flyout, theme tokens | App launches on Linux; menu flyout works; lint/test green; tagged v0.1.0 produces a GitHub Release with installers for every target |
+| M1  | DB + migrations, library store, Add/Edit song w/ ID3, Artist tree, context menus                                                             | Add a song with GP+MP3; appears under Artist→Album→Song                                                                             |
+| M2  | alphaTab render + synth playback, footer controls, metronome, count-in, loop/select, speed                                                   | Play a GP file; loop 4 bars at 60% with count-in                                                                                    |
+| M3  | Multi-track panel: solo/mute/volume, per-track view                                                                                          | Play each track separately                                                                                                          |
+| M4  | MP3 engine, offset + sync points, sync editor, stems, source selector, pitch-preserved speed                                                 | MP3 and cursor within 30 ms over a full song; stems switch                                                                          |
+| M5  | Search (FTS), playlists, favorites, queue                                                                                                    | Search finds by artist/album/title                                                                                                  |
+| M6  | Preferences, backup/restore, help flyout, about + update check                                                                               | Backup→wipe→restore round trip passes                                                                                               |
+| M7  | Packaging, release workflow, polish, a11y pass                                                                                               | Installers build on all 3 OSes                                                                                                      |
 
 ## 13. Risks
 

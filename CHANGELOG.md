@@ -8,7 +8,8 @@ All notable changes to Tab King. Format: [Keep a Changelog](https://keepachangel
 
 - Electron + React + TypeScript + Tailwind project scaffold (electron-vite).
 - Frameless window with custom title bar (hamburger, minimize, maximize/restore, close).
-- Left flyout menu: File (Preferences, Backup/Restore) and Help (Contents, About); entries are stubs until M6.
+- Title-bar menu bar: File (Preferences, Backup/Restore) and Help (Help Contents, About); entries are stubs until M6.
+- Left hamburger flyout with library navigation: Play Lists, Favorites, Artists (views are placeholders until M1/M5).
 - Theme tokens (light/dark, follows system) via CSS variables.
 - Secure window baseline: context isolation, sandboxed preload, typed IPC, CSP, navigation lockdown.
 - Persisted window size, position and maximized state.

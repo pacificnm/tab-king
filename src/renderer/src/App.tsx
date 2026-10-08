@@ -1,10 +1,18 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Flyout } from './components/Flyout'
-import { MainMenu, type MenuAction } from './components/MainMenu'
+import type { MenuAction } from './components/MenuBar'
+import { NavMenu, type NavView } from './components/NavMenu'
 import { TitleBar } from './components/TitleBar'
+
+const VIEW_TITLES: Record<NavView, string> = {
+  playlists: 'Play Lists',
+  favorites: 'Favorites',
+  artists: 'Artists'
+}
 
 export function App(): React.JSX.Element {
   const [menuOpen, setMenuOpen] = useState(false)
+  const [view, setView] = useState<NavView | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [version, setVersion] = useState('')
 
@@ -14,8 +22,12 @@ export function App(): React.JSX.Element {
 
   const closeMenu = useCallback(() => setMenuOpen(false), [])
 
-  const onSelect = useCallback((action: MenuAction) => {
+  const onNav = useCallback((v: NavView) => {
     setMenuOpen(false)
+    setView(v)
+  }, [])
+
+  const onAction = useCallback((action: MenuAction) => {
     // Real dialogs/flyouts arrive in M6; stubbed here.
     setNotice(`"${action}" is not implemented yet`)
   }, [])
@@ -28,12 +40,12 @@ export function App(): React.JSX.Element {
 
   return (
     <div className="relative flex h-full flex-col bg-bg text-fg">
-      <TitleBar menuOpen={menuOpen} onMenu={() => setMenuOpen((o) => !o)} />
-      <Flyout open={menuOpen} side="left" label="Main menu" onClose={closeMenu}>
-        <MainMenu onSelect={onSelect} />
+      <TitleBar menuOpen={menuOpen} onMenu={() => setMenuOpen((o) => !o)} onAction={onAction} />
+      <Flyout open={menuOpen} side="left" label="Library" onClose={closeMenu}>
+        <NavMenu active={view} onSelect={onNav} />
       </Flyout>
       <main className="flex flex-1 items-center justify-center text-fg-muted">
-        <p>Tab King {version && `v${version}`}</p>
+        <p>{view ? VIEW_TITLES[view] : `Tab King ${version && `v${version}`}`}</p>
       </main>
       {notice && (
         <div
