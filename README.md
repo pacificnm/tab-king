@@ -4,7 +4,7 @@ A desktop guitar tab player in the spirit of [Songsterr](https://www.songsterr.c
 
 Single-user, offline-first, open source (Apache-2.0).
 
-> Status: **in development** (v0.3.0: library plus synth playback — tab rendering with cursor, metronome, count-in, loop, speed). MP3 stems and sync come later. See [docs/](docs/) and [CHANGELOG.md](CHANGELOG.md).
+> Status: **in development** (v0.4.0: library, synth playback, and a track panel with solo/mute/volume and single-track practice). MP3 stems and sync come later. See [docs/](docs/) and [CHANGELOG.md](CHANGELOG.md).
 
 ## Features (planned)
 

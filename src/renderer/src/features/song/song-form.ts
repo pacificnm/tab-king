@@ -1,4 +1,12 @@
-import type { AudioSource, CoverChoice, FileRef, Id3Info, Song, SongForm } from '@shared/types'
+import type {
+  AudioSource,
+  CoverChoice,
+  FileRef,
+  Id3Info,
+  Song,
+  SongForm,
+  SynthSource
+} from '@shared/types'
 import type { GpMetadata } from '../../player/gp-metadata'
 
 export type Slot =
@@ -20,6 +28,8 @@ export interface TrackState {
   mp3: Slot
   source: AudioSource
   volume: number
+  muted: boolean
+  solo: boolean
 }
 
 export interface FormState {
@@ -29,6 +39,8 @@ export interface FormState {
   midi: Slot
   master: Slot
   masterSource: AudioSource
+  /** Not edited in the dialog; carried through so saving doesn't reset the track panel's choice. */
+  synthSource: SynthSource
   syncOffsetMs: string
   tracks: TrackState[]
   durationMs: number | null
@@ -51,6 +63,7 @@ export function emptyState(preset?: { artist?: string; album?: string }): FormSt
     midi: NO_SLOT,
     master: NO_SLOT,
     masterSource: 'synth',
+    synthSource: 'gp',
     syncOffsetMs: '0',
     tracks: [],
     durationMs: null,
@@ -81,6 +94,7 @@ export function stateFromSong(song: Song, coverUrl: string | null): FormState {
     midi: slot(song.midiPath),
     master: slot(song.masterMp3Path),
     masterSource: song.masterSource,
+    synthSource: song.synthSource,
     syncOffsetMs: String(song.syncOffsetMs),
     tracks: song.tracks.map((t) => ({ ...t, mp3: slot(t.mp3Path) })),
     durationMs: song.durationMs,
@@ -128,7 +142,9 @@ export function applyGp(state: FormState, gp: GpMetadata): FormState {
       instrument: t.instrument,
       mp3: prev?.mp3 ?? NO_SLOT,
       source: prev?.source ?? 'synth',
-      volume: prev?.volume ?? 1
+      volume: prev?.volume ?? 1,
+      muted: prev?.muted ?? false,
+      solo: prev?.solo ?? false
     }
   })
   return next
@@ -191,6 +207,7 @@ export function toSongForm(state: FormState): SongForm {
     midi: toRef(state.midi),
     masterMp3: toRef(state.master),
     masterSource: state.master.kind === 'none' ? 'synth' : state.masterSource,
+    synthSource: state.midi.kind === 'none' ? 'gp' : state.synthSource,
     syncOffsetMs: Number(state.syncOffsetMs) || 0,
     tracks: state.tracks.map((t) => ({
       trackIndex: t.trackIndex,
@@ -198,7 +215,9 @@ export function toSongForm(state: FormState): SongForm {
       instrument: t.instrument,
       mp3: toRef(t.mp3),
       source: t.mp3.kind === 'none' ? 'synth' : t.source,
-      volume: t.volume
+      volume: t.volume,
+      muted: t.muted,
+      solo: t.solo
     })),
     cover: state.cover
   }

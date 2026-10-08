@@ -144,6 +144,7 @@ describe('validation and output', () => {
       midiPath: null,
       masterMp3Path: 'Rush/MP/YYZ/m.mp3',
       masterSource: 'mp3',
+      synthSource: 'midi',
       syncOffsetMs: 120,
       durationMs: 1000,
       tracks: [
@@ -153,11 +154,18 @@ describe('validation and output', () => {
           instrument: 'Guitar',
           mp3Path: null,
           source: 'synth',
-          volume: 1
+          volume: 0.7,
+          muted: true,
+          solo: false
         }
       ]
     }
     const f = toSongForm(stateFromSong(song, 'tabking://library/x'))
+    // the track panel's choices survive an edit/save round trip
+    expect(f.tracks[0]).toMatchObject({ volume: 0.7, muted: true, solo: false })
+    expect(toSongForm({ ...stateFromSong(song, null), midi: { kind: 'none' } }).synthSource).toBe(
+      'gp'
+    )
     expect(f).toMatchObject({
       gp: { existing: song.gpPath },
       masterMp3: { existing: song.masterMp3Path },
@@ -166,6 +174,7 @@ describe('validation and output', () => {
       year: 1981,
       trackNo: 2,
       masterSource: 'mp3',
+      synthSource: 'gp',
       syncOffsetMs: 120,
       cover: 'keep',
       durationMs: 1000

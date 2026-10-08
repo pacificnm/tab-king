@@ -8,7 +8,8 @@ import type {
   PickKind,
   Result,
   Song,
-  SongForm
+  SongForm,
+  SongMix
 } from './types'
 
 export { IPC } from './ipc-channels'
@@ -24,6 +25,8 @@ const FileRefSchema = z
   .union([z.object({ existing: z.string().min(1) }), z.object({ token: z.string().min(1) })])
   .nullable()
 const AudioSourceSchema = z.enum(['synth', 'mp3'])
+const SynthSourceSchema = z.enum(['gp', 'midi'])
+const VolumeSchema = z.number().min(0).max(2)
 const optText = z.string().trim().max(300).nullable()
 const optInt = z.number().int().min(0).max(1_000_000_000).nullable()
 
@@ -40,6 +43,7 @@ export const SongFormSchema = z.object({
   midi: FileRefSchema,
   masterMp3: FileRefSchema,
   masterSource: AudioSourceSchema,
+  synthSource: SynthSourceSchema,
   syncOffsetMs: z.number().int().min(-3_600_000).max(3_600_000),
   tracks: z
     .array(
@@ -49,11 +53,27 @@ export const SongFormSchema = z.object({
         instrument: z.string().max(300).nullable(),
         mp3: FileRefSchema,
         source: AudioSourceSchema,
-        volume: z.number().min(0).max(2)
+        volume: VolumeSchema,
+        muted: z.boolean(),
+        solo: z.boolean()
       })
     )
     .max(256),
   cover: z.enum(['keep', 'id3', 'none'])
+})
+
+export const SongMixSchema = z.object({
+  synthSource: SynthSourceSchema,
+  tracks: z
+    .array(
+      z.object({
+        trackIndex: z.number().int().min(0).max(999),
+        volume: VolumeSchema,
+        muted: z.boolean(),
+        solo: z.boolean()
+      })
+    )
+    .max(256)
 })
 
 /** API exposed to the renderer as `window.api`. */
@@ -83,6 +103,8 @@ export interface TabKingApi {
     deleteSong(id: number, deleteFiles: boolean): Promise<Result<null>>
     renameArtist(id: number, name: string): Promise<Result<null>>
     updateAlbum(id: number, title: string, year: number | null): Promise<Result<null>>
+    /** Persist the track panel's mix (volume/mute/solo per track, synth source) for a song. */
+    saveMix(songId: number, mix: SongMix): Promise<Result<null>>
     checkSong(id: number): Promise<FileCheck[]>
     onChanged(cb: () => void): () => void
   }

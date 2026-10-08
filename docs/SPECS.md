@@ -55,10 +55,12 @@ artist(id PK, name UNIQUE COLLATE NOCASE)
 album(id PK, artist_id FK, title, year, cover_path, UNIQUE(artist_id,title))
 song(id PK, album_id FK NULL, artist_id FK, title, track_no, genre, year,
      gp_path NOT NULL, midi_path, master_mp3_path,
+     synth_source TEXT CHECK(synth_source IN ('gp','midi')) DEFAULT 'gp',  -- 002
      sync_offset_ms INT DEFAULT 0, duration_ms, created_at, updated_at)
 song_track(id PK, song_id FK, track_index INT, name, instrument,
            mp3_path, source TEXT CHECK(source IN ('synth','mp3')) DEFAULT 'synth',
-           volume REAL DEFAULT 1, UNIQUE(song_id,track_index))
+           volume REAL DEFAULT 1, muted INT DEFAULT 0, solo INT DEFAULT 0,   -- 002
+           UNIQUE(song_id,track_index))
 sync_point(id PK, song_id FK, measure INT, mp3_ms INT, UNIQUE(song_id,measure))
 playlist(id PK, name UNIQUE)
 playlist_song(playlist_id FK, song_id FK, position INT, PK(playlist_id,song_id))
@@ -113,7 +115,7 @@ Main region = alphaTab surface + track panel (collapsible, left or top). Static 
 ### 6.2 alphaTab integration (`src/renderer/src/player/`)
 
 - `PlayerEngine` (`player-engine.ts`) is the only code that touches `AlphaTabApi`. Components call the `player` controller in `index.ts` and read the Zustand `usePlayerStore`; alphaTab events are translated into store updates. The engine is created by the lazy-loaded `TabView` (alphaTab is ~2.3 MB, loaded on first Play) and attached to the controller; commands are no-ops until then.
-- Settings: `enablePlayer`, `enableCursor`, `enableUserInteraction`, `enableElementHighlighting`, `scrollMode: continuous` with the tab view's scroll container as `scrollElement`. The SoundFont is fetched from `tabking://app/soundfont/sonivox.sf3` and passed as bytes (`loadSoundFont`); Bravura loads from `tabking://app/font/` (`core.fontDirectory`). Nothing comes from a CDN.
+- Settings: `enablePlayer`, `enableCursor`, `enableUserInteraction`, `enableElementHighlighting`, `scrollMode: continuous` with the tab view's scroll container as `scrollElement`. The SoundFont is `player.soundFont = tabking://app/soundfont/sonivox.sf3` and alphaTab sequences the download against its own player/MIDI setup (fetching the bytes ourselves and calling `loadSoundFont` raced with that setup: the SoundFont was silently dropped whenever it arrived before the first score finished loading). Bravura loads from `tabking://app/font/` (`core.fontDirectory`). Nothing comes from a CDN.
 - **Media protocol hosts.** `tabking://library/<rel>` serves user files; `tabking://app/<rel>` serves bundled assets from `resources/`, restricted to the `soundfont/` and `font/` prefixes. Both send `Access-Control-Allow-Origin: *` and the scheme is registered `corsEnabled`, because the page origin is `file://` (production) or the Vite dev server.
 - **Bundling.** `@coderline/alphatab-vite` handles workers/worklets (its asset copying is off; we serve assets ourselves). The renderer config defines `__BASE__` so alphaTab recognises the Vite build — without it the render worker and audio worklet cannot be located. alphaTab is pinned to an exact version.
 - Position/measure: `playerPositionChanged` drives time and (when idle or seeking) the measure via the tick→measure table built from `tickCache`; `playedBeatChanged` gives the measure while playing, so repeats display correctly.

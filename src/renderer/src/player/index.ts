@@ -1,4 +1,5 @@
-import type { Song } from '@shared/types'
+import type { Song, SynthSource } from '@shared/types'
+import { flushMix } from './mix-persistence'
 import type { PlayerEngine } from './player-engine'
 import { clampSpeed, stepSpeed } from './player-math'
 import { usePlayerStore, type TabLayout } from './store'
@@ -25,6 +26,7 @@ export const player = {
 
   /** Open a song in the player; with `autoplay` it starts as soon as it is ready. */
   open(song: Song, autoplay = true): void {
+    flushMix() // save the previous song's track mix before it is replaced
     set((s) => ({ song, openToken: s.openToken + 1, autoplay, status: 'loading', error: null }))
   },
   /** Report a load failure (e.g. missing file) so the tab view shows it instead of crashing. */
@@ -51,6 +53,13 @@ export const player = {
   setRange: (start: number, end: number) => engine?.setRange(start, end),
   clearRange: () => engine?.clearRange(),
   setMasterVolume: (v: number) => engine?.setMasterVolume(v),
+
+  setTrackVolume: (index: number, volume: number) => engine?.setTrackVolume(index, volume),
+  toggleMute: (index: number) => engine?.toggleMute(index),
+  toggleSolo: (index: number) => engine?.toggleSolo(index),
+  /** Practice a single track (render + play it alone); pass null to restore the full score and mix. */
+  setPractice: (index: number | null) => engine?.setPractice(index),
+  setSynthSource: (source: SynthSource) => engine?.setSynthSource(source),
 
   setZoom: (zoom: number) => engine?.setZoom(zoom),
   setLayout: (layout: TabLayout) => engine?.setLayout(layout)

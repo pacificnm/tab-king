@@ -1,7 +1,7 @@
 import { BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent } from 'electron'
 import { readFile } from 'node:fs/promises'
 import { z } from 'zod'
-import { IPC, SongFormSchema } from '@shared/ipc-contract'
+import { IPC, SongFormSchema, SongMixSchema } from '@shared/ipc-contract'
 import type { Id3Info, PickKind, Result } from '@shared/types'
 import type { LibraryRepo } from '../db/repo/library-repo'
 import { readId3 } from './id3'
@@ -117,6 +117,14 @@ export function registerLibraryIpc({ repo, service, picked }: LibraryIpcDeps): v
       sender(e)
       service.deleteSong(id.parse(songId), z.boolean().parse(deleteFiles))
       changed()
+      return null
+    })
+  )
+  // Not broadcast as a library change: only the player reads the mix, and it already has it.
+  ipcMain.handle(IPC.libSaveMix, (e, songId, mix) =>
+    wrap(() => {
+      sender(e)
+      repo.saveMix(id.parse(songId), SongMixSchema.parse(mix))
       return null
     })
   )

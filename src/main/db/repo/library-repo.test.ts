@@ -27,7 +27,9 @@ describe('LibraryRepo', () => {
           instrument: 'guitar',
           mp3Path: 'g.mp3',
           source: 'mp3',
-          volume: 0.5
+          volume: 0.5,
+          muted: false,
+          solo: false
         }
       ]
     })
@@ -41,7 +43,7 @@ describe('LibraryRepo', () => {
     expect(b.artistId).toBe(a.artistId)
     expect(b.albumId).toBe(a.albumId)
     expect(a.coverPath).toBe('Rush/MP/cover.jpg')
-    expect(a.tracks[0]).toMatchObject({ source: 'mp3', volume: 0.5 })
+    expect(a.tracks[0]).toMatchObject({ source: 'mp3', volume: 0.5, muted: false, solo: false })
     expect(repo.listArtists()).toEqual([
       { id: a.artistId, name: 'Rush', albumCount: 1, songCount: 2 }
     ])
@@ -74,7 +76,16 @@ describe('LibraryRepo', () => {
       ...base,
       masterMp3Path: 'm.mp3',
       tracks: [
-        { trackIndex: 0, name: 'G', instrument: null, mp3Path: 'g.mp3', source: 'synth', volume: 1 }
+        {
+          trackIndex: 0,
+          name: 'G',
+          instrument: null,
+          mp3Path: 'g.mp3',
+          source: 'synth',
+          volume: 1,
+          muted: false,
+          solo: false
+        }
       ]
     })
     expect(repo.deleteSong(s.id).sort()).toEqual(['Rush/MP/YYZ/yyz.gp', 'g.mp3', 'm.mp3'].sort())
@@ -92,6 +103,52 @@ describe('LibraryRepo', () => {
     expect(artists[0]).toMatchObject({ id: a.artistId, songCount: 2, albumCount: 1 })
     repo.renameArtist(a.artistId, 'Rush!')
     expect(repo.listArtists()[0]?.name).toBe('Rush!')
+  })
+
+  it('persists the track mix and synth source without touching other fields', () => {
+    const s = repo.createSong({
+      ...base,
+      midiPath: 'a.mid',
+      tracks: [
+        {
+          trackIndex: 0,
+          name: 'Lead',
+          instrument: 'Guitar',
+          mp3Path: null,
+          source: 'synth',
+          volume: 1,
+          muted: false,
+          solo: false
+        },
+        {
+          trackIndex: 1,
+          name: 'Bass',
+          instrument: 'Bass',
+          mp3Path: null,
+          source: 'synth',
+          volume: 1,
+          muted: false,
+          solo: false
+        }
+      ]
+    })
+    expect(s.synthSource).toBe('gp')
+    repo.saveMix(s.id, {
+      synthSource: 'midi',
+      tracks: [
+        { trackIndex: 0, volume: 0.4, muted: true, solo: false },
+        { trackIndex: 1, volume: 1.25, muted: false, solo: true },
+        { trackIndex: 9, volume: 1, muted: false, solo: false } // unknown track: ignored
+      ]
+    })
+    const after = repo.getSong(s.id)!
+    expect(after.synthSource).toBe('midi')
+    expect(after.tracks.map((t) => [t.volume, t.muted, t.solo])).toEqual([
+      [0.4, true, false],
+      [1.25, false, true]
+    ])
+    expect(after.title).toBe(s.title)
+    expect(after.tracks).toHaveLength(2)
   })
 
   it('stores settings as JSON', () => {

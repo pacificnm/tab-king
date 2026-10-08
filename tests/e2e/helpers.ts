@@ -7,7 +7,7 @@ import {
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { writeGp, writeTaggedMp3 } from './fixtures'
+import { writeGp, writeMidi, writeTaggedMp3 } from './fixtures'
 
 export const makeTmp = (): string => mkdtempSync(join(tmpdir(), 'tabking-e2e-'))
 
@@ -36,14 +36,19 @@ export async function queueFilePicks(app: ElectronApplication, ...files: string[
 }
 
 /** Add "YYZ" by Rush (GP + tagged master MP3) through the Add dialog. */
-export async function addSong(app: ElectronApplication, page: Page, tmp: string): Promise<void> {
+export async function addSong(
+  app: ElectronApplication,
+  page: Page,
+  tmp: string,
+  opts: { midi?: boolean } = {}
+): Promise<void> {
   const gp = writeGp(tmp, 'song.gp')
   const mp3 = writeTaggedMp3(tmp, 'master.mp3', {
     title: 'YYZ',
     artist: 'Rush',
     album: 'Moving Pictures'
   })
-  await queueFilePicks(app, gp, mp3)
+  await queueFilePicks(app, gp, mp3, ...(opts.midi ? [writeMidi(tmp, 'song.mid')] : []))
   await page.getByRole('button', { name: 'Add song…' }).click()
   const dialog = page.getByRole('dialog', { name: 'Add song' })
   await dialog.getByRole('button', { name: 'Choose…' }).first().click()
@@ -53,6 +58,7 @@ export async function addSong(app: ElectronApplication, page: Page, tmp: string)
   await expect(dialog.getByLabel('Title')).toHaveValue('YYZ') // ID3 overrides GP
   await expect(dialog.getByLabel('Artist')).toHaveValue('Rush')
   await expect(dialog.getByLabel('Album')).toHaveValue('Moving Pictures')
+  if (opts.midi) await dialog.getByRole('button', { name: 'Choose…' }).first().click() // MIDI row
   await dialog.getByRole('button', { name: 'Add song' }).click()
   await expect(page.getByRole('article', { name: 'YYZ' })).toBeVisible()
 }

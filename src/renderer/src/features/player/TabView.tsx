@@ -3,6 +3,8 @@ import { libraryUrl } from '@shared/types'
 import { btn, input } from '../../components/Modal'
 import { player, usePlayerStore } from '../../player'
 import { PlayerEngine } from '../../player/player-engine'
+import { parseSmf, type ParsedSmf } from '../../player/smf'
+import { TrackPanel } from './TrackPanel'
 
 const FONT_DIRECTORY = 'tabking://app/font/'
 const SOUNDFONT_URL = 'tabking://app/soundfont/sonivox.sf3'
@@ -135,16 +137,12 @@ export default function TabView(): React.JSX.Element {
   const openToken = usePlayerStore((s) => s.openToken)
   const status = usePlayerStore((s) => s.status)
   const error = usePlayerStore((s) => s.error)
-  const [soundFontError, setSoundFontError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!container.current || !scroller.current) return
-    const e = new PlayerEngine(container.current, scroller.current, FONT_DIRECTORY)
+    const e = new PlayerEngine(container.current, scroller.current, FONT_DIRECTORY, SOUNDFONT_URL)
     engine.current = e
     player.attach(e)
-    e.loadSoundFont(SOUNDFONT_URL).catch((err: unknown) =>
-      setSoundFontError(err instanceof Error ? err.message : 'Sound could not be loaded')
-    )
     return () => {
       player.detach(e)
       engine.current = null
@@ -159,7 +157,12 @@ export default function TabView(): React.JSX.Element {
     let cancelled = false
     void (async () => {
       try {
-        const res = await fetch(libraryUrl(current.gpPath))
+        // The track mix may have changed since this song object was fetched, so read it fresh.
+        const [fresh, res] = await Promise.all([
+          window.api.library.getSong(current.id),
+          fetch(libraryUrl(current.gpPath))
+        ])
+        const song = fresh ?? current
         if (!res.ok) {
           throw new Error(
             res.status === 404
@@ -168,7 +171,21 @@ export default function TabView(): React.JSX.Element {
           )
         }
         const bytes = await res.arrayBuffer()
-        if (!cancelled) e.load(bytes)
+        let midi: ParsedSmf | null = null
+        let midiError: string | null = null
+        if (song.midiPath) {
+          try {
+            const m = await fetch(libraryUrl(song.midiPath))
+            if (!m.ok)
+              throw new Error(m.status === 404 ? 'the file is missing' : `HTTP ${m.status}`)
+            midi = parseSmf(new Uint8Array(await m.arrayBuffer()))
+          } catch (err) {
+            midiError = `The attached MIDI file can't be used (${err instanceof Error ? err.message : String(err)}); playing the tab's own notes.`
+          }
+        }
+        if (cancelled) return
+        e.load(bytes, { mix: song.tracks, synthSource: song.synthSource, midi })
+        usePlayerStore.setState({ midiError })
       } catch (err) {
         if (!cancelled) player.fail(err instanceof Error ? err.message : String(err))
       }
@@ -188,9 +205,9 @@ export default function TabView(): React.JSX.Element {
         <RangeControls />
         <ViewControls />
       </div>
-      {(error || soundFontError) && (
+      {error && (
         <p role="alert" className="border-b border-danger px-4 py-2 text-sm text-danger">
-          {error ?? soundFontError}
+          {error}
         </p>
       )}
       {status === 'loading' && (
@@ -198,12 +215,15 @@ export default function TabView(): React.JSX.Element {
           Loading…
         </p>
       )}
-      <div
-        ref={scroller}
-        className="min-h-0 flex-1 overflow-auto bg-white text-black"
-        data-testid="tab-scroller"
-      >
-        <div ref={container} data-testid="tab-surface" />
+      <div className="flex min-h-0 flex-1">
+        <TrackPanel />
+        <div
+          ref={scroller}
+          className="min-h-0 min-w-0 flex-1 overflow-auto bg-white text-black"
+          data-testid="tab-scroller"
+        >
+          <div ref={container} data-testid="tab-surface" />
+        </div>
       </div>
     </div>
   )

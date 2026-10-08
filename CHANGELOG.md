@@ -2,6 +2,24 @@
 
 All notable changes to Tab King. Format: [Keep a Changelog](https://keepachangelog.com/), versions follow [SemVer](https://semver.org/).
 
+## [0.4.0] - 2026-10-08
+
+### Added
+
+- Track panel listing every Guitar Pro track with its name and instrument; songs now show all tracks by default.
+- Per-track solo, mute and volume (0–150%), saved per song and restored on reopening (migration 002).
+- Single-track practice view: render and play one track alone, then "Back to full mix" restores the score and your exact mix.
+- Optional attached MIDI file as the synth's note source, switchable per song (Standard MIDI File parser; keeps the tab's tempo, metronome and cursor).
+- e2e scenarios for track listing, practice view, mix persistence across a restart, and the MIDI source.
+
+### Fixed
+
+- The bundled SoundFont could be silently dropped if it finished downloading before the first score had loaded, leaving the player stuck "not ready". alphaTab now loads it itself (`player.soundFont`).
+
+### Notes
+
+- With the MIDI source the cursor follows the tab's timing, so use a MIDI file exported from the same tab. MP3 stems join the practice view in M4.
+
 ## [0.3.0] - 2026-10-08
 
 ### Added
