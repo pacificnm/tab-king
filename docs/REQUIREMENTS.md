@@ -22,7 +22,7 @@ Single-user, offline desktop app for Linux (x64, ARM64), Windows and macOS that 
 
 | ID    | Requirement                                                                                                                                                                                               | P   |
 | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- |
-| NAV-1 | Hamburger flyout (library navigation) has top-level items: **Play Lists, Favorites, Artists**. (Search placement: see open question 4.)                                                                   | M   |
+| NAV-1 | Hamburger flyout (library navigation) has top-level items: **Play Lists, Favorites, Artists**. (Search placement: see open question 3.)                                                                   | M   |
 | NAV-2 | Artist expands to Albums, which expand to Songs (tree).                                                                                                                                                   | M   |
 | NAV-3 | Every menu item (artist, album, song, playlist) has a right-click context menu with **Add, Edit, Play** (Delete where applicable).                                                                        | M   |
 | NAV-4 | Search matches title, artist, album and tags as you type (full-text), results grouped by type.                                                                                                            | M   |

@@ -83,7 +83,7 @@ Context menus [NAV-3]: Artist → Add song, Edit artist (rename), Play all. Albu
 
 ## 5. Navigation UI [NAV-*]
 
-- Flyout top-level: Play Lists, Favorites, Artists. Search entry point TBD (REQUIREMENTS open question 4). Lazy-loaded tree for Artist → Album → Song with virtualization (react-window) [NFR-3].
+- Flyout top-level: Play Lists, Favorites, Artists. Search entry point TBD (REQUIREMENTS open question 3). Lazy-loaded tree for Artist → Album → Song with virtualization (react-window) [NFR-3].
 - Search: input with 150 ms debounce → `song_fts MATCH` with prefix queries; results grouped Songs / Albums / Artists.
 - Playlists: drag-and-drop reorder; Play starts a queue.
 - Double-click a song or Play opens it in the player and sets queue context (album/playlist/search).
