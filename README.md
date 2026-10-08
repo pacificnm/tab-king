@@ -4,7 +4,7 @@ A desktop guitar tab player in the spirit of [Songsterr](https://www.songsterr.c
 
 Single-user, offline-first, open source (Apache-2.0).
 
-> Status: **in development** (v0.2.0: library — add/edit/delete songs, Artist → Album → Song browsing). Playback arrives in M2. See [docs/](docs/) and [CHANGELOG.md](CHANGELOG.md).
+> Status: **in development** (v0.3.0: library plus synth playback — tab rendering with cursor, metronome, count-in, loop, speed). MP3 stems and sync come later. See [docs/](docs/) and [CHANGELOG.md](CHANGELOG.md).
 
 ## Features (planned)
 
@@ -54,4 +54,4 @@ Releases: bump `version` in `package.json`, add a `CHANGELOG.md` section, then p
 
 ## License
 
-[Apache License 2.0](LICENSE). Third-party notices: alphaTab (MPL-2.0), Electron (MIT), React (MIT). A SoundFont bundled for the synth must be license-compatible (see SPECS §9).
+[Apache License 2.0](LICENSE). Third-party notices are in [NOTICE](NOTICE): alphaTab (MPL-2.0), Electron (MIT), React (MIT), the bundled Sonivox SoundFont (Apache-2.0) and Bravura font (SIL OFL).
