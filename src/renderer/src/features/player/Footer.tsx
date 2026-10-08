@@ -95,7 +95,12 @@ export function Footer({ onShowPlayer }: Props): React.JSX.Element {
             type="button"
             className={toggleBtn(s.metronomeOn)}
             aria-pressed={s.metronomeOn}
-            disabled={!ready}
+            disabled={!ready || s.playbackMode === 'mp3'}
+            title={
+              s.playbackMode === 'mp3'
+                ? 'The metronome is available with synth playback'
+                : undefined
+            }
             onClick={player.toggleMetronome}
           >
             Metronome
@@ -108,7 +113,7 @@ export function Footer({ onShowPlayer }: Props): React.JSX.Element {
             max={1}
             step={0.05}
             value={s.metronomeVolume}
-            disabled={!ready}
+            disabled={!ready || s.playbackMode === 'mp3'}
             onChange={(e) => player.setMetronomeVolume(Number(e.target.value))}
           />
         </div>

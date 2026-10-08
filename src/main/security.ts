@@ -2,7 +2,7 @@ import { app, session, shell, type WebContents } from 'electron'
 
 const PROD_CSP = [
   "default-src 'self'",
-  "script-src 'self'",
+  "script-src 'self' 'wasm-unsafe-eval'",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: tabking:",
   "media-src 'self' blob: tabking:",
@@ -15,10 +15,10 @@ const PROD_CSP = [
 ].join('; ')
 
 // Vite dev server needs inline scripts (React refresh) and websockets (HMR).
-const DEV_CSP = PROD_CSP.replace("script-src 'self'", "script-src 'self' 'unsafe-inline'").replace(
-  "connect-src 'self'",
-  "connect-src 'self' ws://localhost:*"
-)
+const DEV_CSP = PROD_CSP.replace(
+  "script-src 'self' 'wasm-unsafe-eval'",
+  "script-src 'self' 'wasm-unsafe-eval' 'unsafe-inline'"
+).replace("connect-src 'self'", "connect-src 'self' ws://localhost:*")
 
 export function installCsp(isDev: boolean): void {
   const csp = isDev ? DEV_CSP : PROD_CSP

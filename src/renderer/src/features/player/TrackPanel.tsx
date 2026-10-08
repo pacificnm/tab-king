@@ -16,6 +16,12 @@ export function TrackPanel(): React.JSX.Element {
   const hasMidi = usePlayerStore((s) => s.hasMidi)
   const synthSource = usePlayerStore((s) => s.synthSource)
   const midiError = usePlayerStore((s) => s.midiError)
+  const masterSource = usePlayerStore((s) => s.masterSource)
+  const hasMaster = usePlayerStore((s) => s.hasMaster)
+  const playbackMode = usePlayerStore((s) => s.playbackMode)
+  const audioStatus = usePlayerStore((s) => s.audioStatus)
+  const audioError = usePlayerStore((s) => s.audioError)
+  const silenced = usePlayerStore((s) => s.silencedSynthTracks)
   const [open, setOpen] = useState(true)
   const audible = new Set(audibleTracks(tracks, practice))
 
@@ -47,6 +53,48 @@ export function TrackPanel(): React.JSX.Element {
             >
               Back to full mix
             </button>
+          )}
+
+          <p className="mb-2 text-xs text-fg-muted" aria-label="Playback engine">
+            Audio: {playbackMode === 'mp3' ? 'MP3' : 'Synth'}
+          </p>
+          {audioStatus === 'loading' && (
+            <p role="status" className="mb-2 text-xs text-fg-muted">
+              Loading audio…
+            </p>
+          )}
+          {audioError && (
+            <p role="alert" className="mb-2 text-xs text-danger">
+              {audioError}
+            </p>
+          )}
+          {silenced.length > 0 && (
+            <p role="status" className="mb-2 text-xs text-fg-muted">
+              {silenced.length === 1 ? 'A synth track is' : `${silenced.length} synth tracks are`}{' '}
+              silent while MP3 audio plays. Give {silenced.length === 1 ? 'it' : 'them'} an MP3, or
+              choose Synth for the others.
+            </p>
+          )}
+
+          {hasMaster && (
+            <label className="mb-3 flex flex-col gap-1 text-xs">
+              <span className="text-fg-muted">Band plays from</span>
+              <select
+                className={input}
+                value={masterSource}
+                disabled={!ready}
+                onChange={(e) => player.setMasterSource(e.target.value === 'mp3' ? 'mp3' : 'synth')}
+              >
+                <option value="synth">Synth (use the tracks below)</option>
+                <option value="mp3">Master MP3</option>
+              </select>
+              {masterSource === 'mp3' && practice === null && (
+                <span className="text-fg-muted">
+                  The master MP3 is one mix, so solo, mute and volume apply when practicing a track
+                  or using stems.
+                </span>
+              )}
+            </label>
           )}
 
           {hasMidi && (
@@ -93,6 +141,23 @@ export function TrackPanel(): React.JSX.Element {
                     </span>
                     <span className="shrink-0 text-xs text-fg-muted">{t.instrument}</span>
                   </div>
+                  {t.hasMp3 && (
+                    <label className="mt-2 flex items-center gap-2 text-xs">
+                      <span className="text-fg-muted">Source</span>
+                      <select
+                        className={`${input} !w-auto`}
+                        aria-label={`Source for ${t.name}`}
+                        value={t.source}
+                        disabled={!ready}
+                        onChange={(e) =>
+                          player.setTrackSource(t.index, e.target.value === 'mp3' ? 'mp3' : 'synth')
+                        }
+                      >
+                        <option value="synth">Synth</option>
+                        <option value="mp3">Track MP3</option>
+                      </select>
+                    </label>
+                  )}
                   <div className="mt-2 flex items-center gap-2">
                     <button
                       type="button"

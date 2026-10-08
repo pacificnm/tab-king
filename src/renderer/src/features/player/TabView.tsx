@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { libraryUrl } from '@shared/types'
 import { btn, input } from '../../components/Modal'
-import { player, usePlayerStore } from '../../player'
+import { installDiagnostics, player, usePlayerStore } from '../../player'
+import { PAD_MS } from '../../player/mp3-engine'
 import { PlayerEngine } from '../../player/player-engine'
 import { parseSmf, type ParsedSmf } from '../../player/smf'
 import { TrackPanel } from './TrackPanel'
@@ -143,6 +144,7 @@ export default function TabView(): React.JSX.Element {
     const e = new PlayerEngine(container.current, scroller.current, FONT_DIRECTORY, SOUNDFONT_URL)
     engine.current = e
     player.attach(e)
+    if (window.api.app.diagnostics) installDiagnostics(PAD_MS)
     return () => {
       player.detach(e)
       engine.current = null
@@ -184,7 +186,20 @@ export default function TabView(): React.JSX.Element {
           }
         }
         if (cancelled) return
-        e.load(bytes, { mix: song.tracks, synthSource: song.synthSource, midi })
+        e.load(bytes, {
+          mix: song.tracks,
+          synthSource: song.synthSource,
+          midi,
+          masterSource: song.masterSource,
+          masterUrl: song.masterMp3Path ? libraryUrl(song.masterMp3Path) : null,
+          stemUrls: new Map(
+            song.tracks.flatMap((t) =>
+              t.mp3Path ? [[t.trackIndex, libraryUrl(t.mp3Path)] as const] : []
+            )
+          ),
+          syncOffsetMs: song.syncOffsetMs,
+          syncPoints: song.syncPoints
+        })
         usePlayerStore.setState({ midiError })
       } catch (err) {
         if (!cancelled) player.fail(err instanceof Error ? err.message : String(err))

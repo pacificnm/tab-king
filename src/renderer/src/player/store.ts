@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Song, SynthSource } from '@shared/types'
+import type { AudioSource, Song, SyncPointRow, SynthSource } from '@shared/types'
 import type { Section } from './player-math'
 
 /** A track as shown in the track panel (TRK-1) with its persisted mix (TRK-2). */
@@ -7,11 +7,18 @@ export interface PanelTrack {
   index: number
   name: string
   instrument: string | null
+  /** Which audio represents this track: the synth or its stem MP3 (TRK-4). */
+  source: AudioSource
+  /** A stem MP3 is attached and usable. */
+  hasMp3: boolean
   /** 1 = 100%. */
   volume: number
   muted: boolean
   solo: boolean
 }
+
+export type PlaybackMode = 'synth' | 'mp3'
+export type AudioStatus = 'idle' | 'loading' | 'ready'
 
 export type PlayerStatus = 'idle' | 'loading' | 'ready' | 'error'
 export type TabLayout = 'page' | 'horizontal'
@@ -43,6 +50,19 @@ export interface PlayerState {
   hasMidi: boolean
   midiError: string | null
 
+  /** Which audio represents the whole band: the synth or the master MP3 (TRK-4). */
+  masterSource: AudioSource
+  hasMaster: boolean
+  /** Which engine is the clock right now (decided by the playback plan). */
+  playbackMode: PlaybackMode
+  audioStatus: AudioStatus
+  /** Problems loading MP3 audio; playback falls back to the synth. */
+  audioError: string | null
+  /** Tracks the user wants to hear from the synth while MP3 audio plays (they stay silent). */
+  silencedSynthTracks: number[]
+  syncOffsetMs: number
+  syncPoints: SyncPointRow[]
+
   speed: number
   metronomeOn: boolean
   metronomeVolume: number
@@ -73,6 +93,14 @@ export const initialPlayerState: PlayerState = {
   synthSource: 'gp',
   hasMidi: false,
   midiError: null,
+  masterSource: 'synth',
+  hasMaster: false,
+  playbackMode: 'synth',
+  audioStatus: 'idle',
+  audioError: null,
+  silencedSynthTracks: [],
+  syncOffsetMs: 0,
+  syncPoints: [],
   speed: 1,
   metronomeOn: false,
   metronomeVolume: 0.6,

@@ -135,20 +135,64 @@ describe('LibraryRepo', () => {
     expect(s.synthSource).toBe('gp')
     repo.saveMix(s.id, {
       synthSource: 'midi',
+      masterSource: 'mp3',
       tracks: [
-        { trackIndex: 0, volume: 0.4, muted: true, solo: false },
-        { trackIndex: 1, volume: 1.25, muted: false, solo: true },
-        { trackIndex: 9, volume: 1, muted: false, solo: false } // unknown track: ignored
+        { trackIndex: 0, source: 'mp3', volume: 0.4, muted: true, solo: false },
+        { trackIndex: 1, source: 'synth', volume: 1.25, muted: false, solo: true },
+        { trackIndex: 9, source: 'synth', volume: 1, muted: false, solo: false } // unknown track: ignored
       ]
     })
     const after = repo.getSong(s.id)!
     expect(after.synthSource).toBe('midi')
+    expect(after.masterSource).toBe('mp3')
+    expect(after.tracks.map((t) => t.source)).toEqual(['mp3', 'synth'])
     expect(after.tracks.map((t) => [t.volume, t.muted, t.solo])).toEqual([
       [0.4, true, false],
       [1.25, false, true]
     ])
     expect(after.title).toBe(s.title)
     expect(after.tracks).toHaveLength(2)
+  })
+
+  it('saves the start offset and replaces sync points as a unit', () => {
+    const s = repo.createSong(base)
+    expect(s.syncPoints).toEqual([])
+    repo.saveSync(s.id, {
+      offsetMs: -1500,
+      points: [
+        { measure: 9, mp3Ms: 20000 },
+        { measure: 3, mp3Ms: 5000 }
+      ]
+    })
+    let after = repo.getSong(s.id)!
+    expect(after.syncOffsetMs).toBe(-1500)
+    expect(after.syncPoints).toEqual([
+      { measure: 3, mp3Ms: 5000 },
+      { measure: 9, mp3Ms: 20000 }
+    ])
+    repo.saveSync(s.id, { offsetMs: 0, points: [{ measure: 4, mp3Ms: 7000 }] })
+    after = repo.getSong(s.id)!
+    expect(after.syncPoints).toEqual([{ measure: 4, mp3Ms: 7000 }])
+    // a duplicate measure violates the table's uniqueness and rolls the whole save back
+    expect(() =>
+      repo.saveSync(s.id, {
+        offsetMs: 999,
+        points: [
+          { measure: 2, mp3Ms: 1 },
+          { measure: 2, mp3Ms: 2 }
+        ]
+      })
+    ).toThrow(/UNIQUE/)
+    after = repo.getSong(s.id)!
+    expect(after.syncOffsetMs).toBe(0)
+    expect(after.syncPoints).toEqual([{ measure: 4, mp3Ms: 7000 }])
+  })
+
+  it('deleting a song removes its sync points', () => {
+    const s = repo.createSong(base)
+    repo.saveSync(s.id, { offsetMs: 0, points: [{ measure: 2, mp3Ms: 100 }] })
+    repo.deleteSong(s.id)
+    expect(repo['db'].prepare('SELECT COUNT(*) c FROM sync_point').get()).toEqual({ c: 0 })
   })
 
   it('stores settings as JSON', () => {

@@ -1,7 +1,7 @@
 import { BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent } from 'electron'
 import { readFile } from 'node:fs/promises'
 import { z } from 'zod'
-import { IPC, SongFormSchema, SongMixSchema } from '@shared/ipc-contract'
+import { IPC, SongFormSchema, SongMixSchema, SongSyncSchema } from '@shared/ipc-contract'
 import type { Id3Info, PickKind, Result } from '@shared/types'
 import type { LibraryRepo } from '../db/repo/library-repo'
 import { readId3 } from './id3'
@@ -125,6 +125,13 @@ export function registerLibraryIpc({ repo, service, picked }: LibraryIpcDeps): v
     wrap(() => {
       sender(e)
       repo.saveMix(id.parse(songId), SongMixSchema.parse(mix))
+      return null
+    })
+  )
+  ipcMain.handle(IPC.libSaveSync, (e, songId, sync) =>
+    wrap(() => {
+      sender(e)
+      repo.saveSync(id.parse(songId), SongSyncSchema.parse(sync))
       return null
     })
   )

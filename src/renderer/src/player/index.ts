@@ -1,4 +1,4 @@
-import type { Song, SynthSource } from '@shared/types'
+import type { AudioSource, Song, SyncPointRow, SynthSource } from '@shared/types'
 import { flushMix } from './mix-persistence'
 import type { PlayerEngine } from './player-engine'
 import { clampSpeed, stepSpeed } from './player-math'
@@ -60,7 +60,50 @@ export const player = {
   /** Practice a single track (render + play it alone); pass null to restore the full score and mix. */
   setPractice: (index: number | null) => engine?.setPractice(index),
   setSynthSource: (source: SynthSource) => engine?.setSynthSource(source),
+  /** Hear a track from the synth or its stem MP3. */
+  setTrackSource: (index: number, source: AudioSource) => engine?.setTrackSource(index, source),
+  /** Hear the band from the synth or the master MP3. */
+  setMasterSource: (source: AudioSource) => engine?.setMasterSource(source),
+
+  /** Apply a start offset / sync points immediately (sync editor preview). Does not save. */
+  setSync: (offsetMs: number, points: readonly SyncPointRow[]) => engine?.setSync(offsetMs, points),
+  syncContext: () => engine?.syncContext() ?? null,
+  /** The MP3 engine (null until MP3 audio has been used); for the sync editor's waveform and playhead. */
+  mp3Engine: () => engine?.mp3Engine ?? null,
+  ensureMp3Source: (id: 'master' | `track:${number}`) =>
+    engine?.ensureSource(id) ?? Promise.resolve(false),
 
   setZoom: (zoom: number) => engine?.setZoom(zoom),
   setLayout: (layout: TabLayout) => engine?.setLayout(layout)
+}
+
+/** Test-only probes, installed when the e2e harness launched the app (see `window.api.app.diagnostics`). */
+export interface TabKingDiagnostics {
+  state(): ReturnType<typeof usePlayerStore.getState>
+  timing(): ReturnType<PlayerEngine['diagnostics']> | null
+  /** Start watching audio output for beeps; call the returned function to stop and get media-ms onsets. */
+  probeOnsets(): (() => { mediaMs: number; freqHz: number; ctxTime: number }[]) | null
+  cursorSample(): { ctxTime: number; outputLatency: number; tabMs: number } | null
+  tabMsForFileMs(fileMs: number): number | null
+  player: typeof player
+  /** The pad every media position includes. */
+  padMs: number
+}
+
+declare global {
+  interface Window {
+    __tabking?: TabKingDiagnostics
+  }
+}
+
+export function installDiagnostics(padMs: number): void {
+  window.__tabking = {
+    state: () => usePlayerStore.getState(),
+    timing: () => engine?.diagnostics() ?? null,
+    probeOnsets: () => engine?.mp3Engine?.probeOnsets() ?? null,
+    cursorSample: () => engine?.cursorSample() ?? null,
+    tabMsForFileMs: (fileMs) => engine?.tabMsForFileMs(fileMs) ?? null,
+    player,
+    padMs
+  }
 }
