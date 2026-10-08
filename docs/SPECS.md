@@ -42,7 +42,7 @@ docs/ tests/
 - Title bar: `-webkit-app-region: drag`; interactive children `no-drag`. Buttons call `window.api.win.{minimize,toggleMaximize,close}`.
 - Resizing: frameless windows resize natively on Windows/macOS; on Linux add invisible 4 px resize handles if the WM doesn't provide them (verify per WM).
 - Title bar order: hamburger · app title · menu bar (File, Help) · drag space · window buttons. The menu bar (`MenuBar`) is an ARIA `menubar` with drop-down `menu`s: File → Preferences, Backup / Restore; Help → Help Contents, About. Arrow keys move between items/menus, Enter activates, Esc closes; hovering another top-level item while one is open switches menus.
-- Left flyout (`Flyout` + `NavMenu`): React slide-in panel (≈280 px) over content with backdrop; contains library navigation only (Play Lists, Favorites, Artists); focus-trapped, Esc closes.
+- Left flyout (`Flyout` + `NavMenu`): React slide-in panel (≈280 px) over content with backdrop; contains library navigation only (Search, Play Lists, Favorites, Artists); focus-trapped, Esc closes.
 - Right help flyout: slide-in panel with TOC list (from `resources/help/toc.json`) and rendered Markdown (react-markdown).
 - Window bounds saved to `settings` (debounced).
 
@@ -83,7 +83,7 @@ Context menus [NAV-3]: Artist → Add song, Edit artist (rename), Play all. Albu
 
 ## 5. Navigation UI [NAV-*]
 
-- Flyout top-level: Play Lists, Favorites, Artists. Search entry point TBD (REQUIREMENTS open question 3). Lazy-loaded tree for Artist → Album → Song with virtualization (react-window) [NFR-3].
+- Flyout top-level, in order: Search, Play Lists, Favorites, Artists. Lazy-loaded tree for Artist → Album → Song with virtualization (react-window) [NFR-3].
 - Search: input with 150 ms debounce → `song_fts MATCH` with prefix queries; results grouped Songs / Albums / Artists.
 - Playlists: drag-and-drop reorder; Play starts a queue.
 - Double-click a song or Play opens it in the player and sets queue context (album/playlist/search).

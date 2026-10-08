@@ -22,7 +22,7 @@ Single-user, offline desktop app for Linux (x64, ARM64), Windows and macOS that 
 
 | ID    | Requirement                                                                                                                                                                                               | P   |
 | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- |
-| NAV-1 | Hamburger flyout (library navigation) has top-level items: **Play Lists, Favorites, Artists**. (Search placement: see open question 3.)                                                                   | M   |
+| NAV-1 | Hamburger flyout (library navigation) has top-level items, in order: **Search, Play Lists, Favorites, Artists**.                                                                                          | M   |
 | NAV-2 | Artist expands to Albums, which expand to Songs (tree).                                                                                                                                                   | M   |
 | NAV-3 | Every menu item (artist, album, song, playlist) has a right-click context menu with **Add, Edit, Play** (Delete where applicable).                                                                        | M   |
 | NAV-4 | Search matches title, artist, album and tags as you type (full-text), results grouped by type.                                                                                                            | M   |
@@ -120,5 +120,4 @@ Folder scanning/watching, cloud sync, multi-user, tab editing/authoring, online 
 
 1. Which SoundFont to bundle (e.g. a small GM sf2/sf3 with a permissive license)? Needs a license check.
 2. Should Previous/Next in the footer move by measure, section, or song? Spec assumes measure/section, with long-press or modifier for song.
-3. Search is no longer in the hamburger flyout. Where does it live — a search box in the title bar/main area, or a keyboard-invoked panel (Ctrl+K)? NAV-4 still requires full-text search.
-4. Is app-level undo needed for library edits? Assumed no.
+3. Is app-level undo needed for library edits? Assumed no.

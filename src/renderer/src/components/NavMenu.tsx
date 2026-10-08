@@ -1,4 +1,4 @@
-export type NavView = 'playlists' | 'favorites' | 'artists'
+export type NavView = 'search' | 'playlists' | 'favorites' | 'artists'
 
 interface Props {
   active: NavView | null
@@ -6,6 +6,7 @@ interface Props {
 }
 
 const ITEMS: { id: NavView; label: string }[] = [
+  { id: 'search', label: 'Search' },
   { id: 'playlists', label: 'Play Lists' },
   { id: 'favorites', label: 'Favorites' },
   { id: 'artists', label: 'Artists' }

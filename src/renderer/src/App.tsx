@@ -5,6 +5,7 @@ import { NavMenu, type NavView } from './components/NavMenu'
 import { TitleBar } from './components/TitleBar'
 
 const VIEW_TITLES: Record<NavView, string> = {
+  search: 'Search',
   playlists: 'Play Lists',
   favorites: 'Favorites',
   artists: 'Artists'
