@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 import { rmSync } from 'node:fs'
-import { launchApp, makeTmp } from './helpers'
+import { closeApp, launchApp, makeTmp } from './helpers'
 import { seedMany } from './seed'
 
 // Startup budget (NFR-2: interactive in < 3 s on x64). CI runners are slower and share a disk with the build,
@@ -44,7 +44,7 @@ test('the app starts, is usable within the startup budget, and reports its versi
     )
   } finally {
     console.log('step: close')
-    await app.close().catch(() => undefined)
+    await closeApp(app)
     rmSync(tmp, { recursive: true, force: true })
   }
 })
@@ -64,7 +64,7 @@ test('a 5,000-song library does not slow start-up down (NFR-2, NFR-3)', async ()
     console.log(`startup with 5,000 songs: ${startupMs} ms (budget ${BUDGET_MS} ms)`)
     expect(startupMs).toBeLessThan(BUDGET_MS)
   } finally {
-    await app.close().catch(() => undefined)
+    await closeApp(app)
     rmSync(tmp, { recursive: true, force: true })
   }
 })
