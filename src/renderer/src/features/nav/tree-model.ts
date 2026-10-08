@@ -1,4 +1,4 @@
-import type { AlbumRow, ArtistRow, Song } from '@shared/types'
+import type { AlbumRow, ArtistRow, PlaylistRow, Song } from '@shared/types'
 
 export type NavId = 'search' | 'playlists' | 'favorites' | 'artists'
 
@@ -12,6 +12,7 @@ export const NAV_ITEMS: { id: NavId; label: string }[] = [
 
 export interface TreeData {
   artists: ArtistRow[] | null
+  playlists: PlaylistRow[] | null
   albums: Record<number, AlbumRow[]>
   /** Keyed by {@link songsKey}. */
   songs: Record<string, Song[]>
@@ -19,6 +20,7 @@ export interface TreeData {
 
 export interface Expanded {
   artists: boolean
+  playlists: boolean
   artistIds: ReadonlySet<number>
   /** Keys from {@link songsKey}. */
   songGroups: ReadonlySet<string>
@@ -35,6 +37,7 @@ export type TreeRow =
       expanded: boolean
     }
   | { key: string; kind: 'artist'; level: 2; artist: ArtistRow; expanded: boolean }
+  | { key: string; kind: 'playlist'; level: 2; playlist: PlaylistRow }
   | { key: string; kind: 'album'; level: 3; artist: ArtistRow; album: AlbumRow; expanded: boolean }
   | { key: string; kind: 'song'; level: 3 | 4; song: Song }
   | { key: string; kind: 'status'; level: 2 | 3 | 4; text: string }
@@ -44,31 +47,49 @@ export const songsKey = (artistId: number, albumId: number | null): string =>
   `${artistId}:${albumId ?? 'none'}`
 
 export function emptyData(): TreeData {
-  return { artists: null, albums: {}, songs: {} }
+  return { artists: null, playlists: null, albums: {}, songs: {} }
 }
 
 /** Flatten the loaded/expanded tree into the rows the virtualized list renders. */
 export function buildRows(data: TreeData, exp: Expanded): TreeRow[] {
-  const rows: TreeRow[] = NAV_ITEMS.map((n) => ({
-    key: `nav:${n.id}`,
-    kind: 'nav',
-    level: 1,
-    id: n.id,
-    label: n.label,
-    expandable: n.id === 'artists',
-    expanded: n.id === 'artists' && exp.artists
+  const rows: TreeRow[] = []
+  for (const n of NAV_ITEMS) {
+    const open = n.id === 'artists' ? exp.artists : n.id === 'playlists' ? exp.playlists : false
+    rows.push({
+      key: `nav:${n.id}`,
+      kind: 'nav',
+      level: 1,
+      id: n.id,
+      label: n.label,
+      expandable: n.id === 'artists' || n.id === 'playlists',
+      expanded: open
+    })
+    if (n.id === 'playlists' && open) rows.push(...playlistRows(data))
+    if (n.id === 'artists' && open) rows.push(...artistRows(data, exp))
+  }
+  return rows
+}
+
+function playlistRows(data: TreeData): TreeRow[] {
+  if (!data.playlists)
+    return [{ key: 'status:playlists', kind: 'status', level: 2, text: 'Loading…' }]
+  if (data.playlists.length === 0) {
+    return [{ key: 'status:playlists', kind: 'status', level: 2, text: 'No play lists yet' }]
+  }
+  return data.playlists.map((playlist) => ({
+    key: `playlist:${playlist.id}`,
+    kind: 'playlist' as const,
+    level: 2 as const,
+    playlist
   }))
-  if (!exp.artists) return rows
+}
 
-  if (!data.artists) {
-    rows.push({ key: 'status:artists', kind: 'status', level: 2, text: 'Loading…' })
-    return rows
-  }
+function artistRows(data: TreeData, exp: Expanded): TreeRow[] {
+  const rows: TreeRow[] = []
+  if (!data.artists) return [{ key: 'status:artists', kind: 'status', level: 2, text: 'Loading…' }]
   if (data.artists.length === 0) {
-    rows.push({ key: 'status:artists', kind: 'status', level: 2, text: 'No songs yet' })
-    return rows
+    return [{ key: 'status:artists', kind: 'status', level: 2, text: 'No songs yet' }]
   }
-
   for (const artist of data.artists) {
     const open = exp.artistIds.has(artist.id)
     rows.push({ key: `artist:${artist.id}`, kind: 'artist', level: 2, artist, expanded: open })

@@ -62,11 +62,12 @@ song_track(id PK, song_id FK, track_index INT, name, instrument,
            volume REAL DEFAULT 1, muted INT DEFAULT 0, solo INT DEFAULT 0,   -- 002
            UNIQUE(song_id,track_index))
 sync_point(id PK, song_id FK, measure INT, mp3_ms INT, UNIQUE(song_id,measure))
-playlist(id PK, name UNIQUE)
-playlist_song(playlist_id FK, song_id FK, position INT, PK(playlist_id,song_id))
+playlist(id PK, name UNIQUE COLLATE NOCASE)
+playlist_song(playlist_id FK, song_id FK, position INT, PK(playlist_id,song_id)),
+  INDEX (playlist_id, position)   -- 003
 favorite(song_id PK FK, created_at)
 settings(key PK, value JSON)
-song_fts  -- FTS5 virtual table over title, artist, album, genre; kept in sync by triggers
+song_fts(title, artist, album, genre)  -- 003: FTS5, rowid = song.id; see §5
 ```
 
 - Paths are stored relative to the library folder. Cascade deletes on song children. Empty albums/artists are pruned on song delete/move.
@@ -92,14 +93,30 @@ Implementation notes (M1):
 - **Media protocol.** `tabking://library/<relpath>`: each path segment is URL-decoded and rejected if empty, `.`/`..` or contains `/`, `\` or NUL; the store then re-checks containment. Single `Range` requests return `206`; unsatisfiable ranges return `416`.
 - **Native module.** `better-sqlite3` 13 ships N-API prebuilds (one binary for Node and Electron), so there is no Electron rebuild step and Vitest tests run against the real driver.
 
-Context menus [NAV-3]: Artist → Add song, Edit artist (rename), Play all. Album → Add song, Edit, Play. Song → Edit, Play, Add to playlist, Favorite, Delete. Playlist → Add, Rename, Play, Delete. "Add" opens the Add dialog preset with that artist/album.
+Context menus [NAV-3]: Artists (root) → Add song. Play Lists (root) → New play list. Artist → Add song, Edit artist (rename), Play all. Album → Add song, Edit, Play. Song → Add song, Edit, Play, Add to play list, Add to/Remove from favorites, Delete. Play list → Add songs, Rename, Play, Delete. "Add" opens the Add dialog preset with that artist/album.
 
 ## 5. Navigation UI [NAV-*]
 
-- Flyout top-level, in order: Search, Play Lists, Favorites, Artists. Lazy-loaded tree for Artist → Album → Song with virtualization (react-window) [NFR-3].
-- Search: input with 150 ms debounce → `song_fts MATCH` with prefix queries; results grouped Songs / Albums / Artists.
-- Playlists: drag-and-drop reorder; Play starts a queue.
-- Double-click a song or Play opens it in the player and sets queue context (album/playlist/search).
+- Flyout top-level, in order: **Search, Play Lists, Favorites, Artists**. Search and Favorites open a view in the main area. **Play Lists** and **Artists** expand in place (the flyout stays open) into play list rows and the lazy-loaded, virtualized Artist → Album → Song tree (react-window) [NFR-3]; they also show an overview / home page behind the flyout. A single click on a song opens its page and the flyout lingers for 300 ms so a **double-click** (play) can finish on the same row; Enter on a focused song plays it.
+- The main area shows one of: home, a song page, Search, Favorites, Play Lists overview, a play list, or an album/artist collection (reached from search results). `App.tsx` holds this as one `MainView` value; list rows and views reach the app through `LibraryActionsContext` (open song/album/artist/play list, play a queue, toggle favorite, context menu).
+
+### 5.1 Search [NAV-4, NFR-3]
+
+- **Index (migration 003).** `song_fts` is a standalone FTS5 table (`unicode61 remove_diacritics 2`, prefix indexes for 2–3 letters) with one row per song and `rowid = song.id`, over _title, artist, album, genre_. Artist and album names live in other tables, so triggers keep it in step: `AFTER INSERT/UPDATE/DELETE ON song` re-index that song, and `AFTER UPDATE OF name ON artist` / `OF title ON album` re-index every song under it (artist merges flow through the song update). The migration back-fills existing songs; a test upgrades a v0.5 database to prove it.
+- **Query.** The box is split into letter/digit words (`searchTokens`), each becomes a quoted prefix term (`"word"*`) and they are ANDed, so punctuation and FTS operators typed by the user are inert. Songs: `song_fts MATCH ? ORDER BY rank LIMIT 50`. Albums and artists are matched with `LIKE '%word%'` on the names (every word must match; for albums, in the album or artist name; wildcards escaped) — these tables are small and a prefix index adds nothing. Matching is case- and accent-insensitive for songs; for album/artist names it is case-insensitive for ASCII only.
+- **UI.** `SearchView`: 150 ms debounce, out-of-order replies discarded, results grouped Songs / Albums / Artists with a live-region count, Enter plays the first song with the results as the queue. Clicking an album or artist result opens its collection page.
+
+### 5.2 Favorites and play lists [NAV-5, NAV-6]
+
+- **Favorites.** A heart on every song row, in the tree, and on the song page toggles `favorite` (also "Add to / Remove from favorites" in the song menu). The Favorites view lists them most recent first.
+- **Play lists.** Create, rename, delete (songs are untouched); each song appears at most once per list; add from a song's menu ("Add to play list…": pick one or create a new one on the spot), from the list's "Add songs…" (searchable picker), or from the Play Lists page. **Reorder** by drag-and-drop or the ↑/↓ buttons on each row (keyboard accessible); `reorder` requires exactly the list's current songs and fails with "the playlist changed" otherwise, so a stale view can't scramble it. Removing a song compacts positions. Names are unique case-insensitively.
+- Play list rows are shown in the tree under Play Lists, with a context menu (Add songs, Rename, Play, Delete).
+
+### 5.3 Queue playback [PLY-8]
+
+- Playing an album, an artist, a play list, Favorites, or search results (double-click, Enter, Play, Play all) opens the song and sets a **queue** — the list it came from — shown in the footer as "n/m" with **Previous song / Next song** buttons. A single song played from the tree or its page queues its album, so playback continues through it.
+- When a song plays through to its natural end the next one starts. This is driven by a `songEnded` counter bumped on alphaTab's `playerFinished` (which does not fire on Stop or while looping). A song whose Guitar Pro file is missing is skipped with a message; at the end of the queue playback simply stops.
+- Previous/Next _measure_ are unchanged (§6.2); song skipping is the separate pair of footer buttons, visible only when the queue has more than one song.
 
 ## 6. Player [PLY-_, TRK-_]
 
@@ -199,12 +216,12 @@ Dialog sections: Appearance (theme), Locations (library, backup folder), Audio (
 
 ## 10. Testing
 
-- Unit (Vitest): sync-map, audibleSet mixing, repo/queries on in-memory SQLite, filename sanitiser, semver compare.
+- Unit (Vitest): sync-map, audibleSet mixing, repo/queries on in-memory SQLite (including FTS trigger sync, an upgrade from the previous schema, and a 5,000-song performance check against the 200 ms budget), queue logic, filename sanitiser, semver compare.
 - Integration: migrations from empty and from each prior version; backup→restore round trip.
-- E2E (Playwright-Electron): add song, browse tree, play/loop, preferences theme, backup/restore, about/update (mocked GitHub).
+- E2E (Playwright-Electron): add song, browse tree, search, favorites, play lists (incl. drag-and-drop and persistence), queue auto-advance, play/loop, preferences theme, backup/restore, about/update (mocked GitHub). Library-scale scenarios seed the database directly (`tests/e2e/seed.ts`) instead of going through the Add dialog; `scale.spec.ts` seeds 5,000 songs and measures IPC calls and the visible UI inside the page.
 - Manual checklist per platform for frameless window behavior and audio devices.
 - Fixtures: GP and MIDI files and tag-only MP3s are generated programmatically (`tests/e2e/fixtures.ts`, via alphaTab's exporter/MIDI generator and a hand-built ID3v2 tag). Real audio fixtures — 24 s of 50 ms beeps every 500 ms (120 bpm) at three pitches — are checked in under `tests/fixtures/` (see its README for the ffmpeg command).
-- **Drift test** (`tests/e2e/drift.spec.ts`, SYN-4): a probe on the audio output records each beep as it reaches the listener; a trace of the cursor on the same clock gives the cursor position at that moment; the sync map says where the beep belongs. Real-time drift must stay ≤ 30 ms for: 100%, 60% and 150% speed (and pitch preserved), a start offset with tempo-warping sync points, a speed change mid-play, seeking mid-play, and loop wraps. Beeps within a short window of a deliberate jump are skipped. Observed: 8–23 ms. The probe is only active when the harness sets `TABKING_E2E`.
+- **Drift test** (`tests/e2e/drift.spec.ts`, SYN-4): a probe on the audio output records each beep as it reaches the listener; a trace of the cursor on the same clock gives the cursor position at that moment; the sync map says where the beep belongs. Real-time drift must stay ≤ 30 ms for the typical beep (90th percentile; a hard ceiling of 60 ms catches regressions while tolerating a rare main-thread stall, since the cursor is drawn on animation frames) for: 100%, 60% and 150% speed (and pitch preserved), a start offset with tempo-warping sync points, a speed change mid-play, seeking mid-play, and loop wraps. Beeps within a short window of a deliberate jump are skipped. Observed over repeated full runs: 90th percentile 6–23 ms, worst single beep ≤ 25 ms. The probe is only active when the harness sets `TABKING_E2E`.
 - **Manual check** for devices the harness can't cover (Bluetooth or high-latency outputs): play a song with an audible metronome-like recording and confirm the cursor lands on each click; Chromium's `outputLatency` is subtracted but some devices under-report it.
 - Run e2e with `npm run test:e2e` (builds first; needs a display, e.g. `xvfb-run`). Native file dialogs are stubbed from the main process. CI integration lands in M7.
 

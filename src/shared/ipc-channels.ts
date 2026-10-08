@@ -22,5 +22,17 @@ export const IPC = {
   libCheckSong: 'lib:check-song',
   libSaveMix: 'lib:save-mix',
   libSaveSync: 'lib:save-sync',
+  libSearch: 'lib:search',
+  libListSongsByArtist: 'lib:list-songs-by-artist',
+  libListFavorites: 'lib:list-favorites',
+  libSetFavorite: 'lib:set-favorite',
+  libPlaylistList: 'lib:playlist-list',
+  libPlaylistCreate: 'lib:playlist-create',
+  libPlaylistRename: 'lib:playlist-rename',
+  libPlaylistDelete: 'lib:playlist-delete',
+  libPlaylistSongs: 'lib:playlist-songs',
+  libPlaylistAdd: 'lib:playlist-add',
+  libPlaylistRemove: 'lib:playlist-remove',
+  libPlaylistReorder: 'lib:playlist-reorder',
   libChanged: 'lib:changed'
 } as const

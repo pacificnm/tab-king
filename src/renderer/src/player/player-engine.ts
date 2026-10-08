@@ -91,6 +91,8 @@ export class PlayerEngine {
   /** Serialises everything that reconfigures playback (mode switches, practice, sources). */
   private op: Promise<void> = Promise.resolve()
   private lastPositionAt = 0
+  private tempoMsFor: TempoEvent[] | null = null
+  private tempoMs: (tick: number) => number = (t) => t
 
   constructor(
     container: HTMLElement,
@@ -440,10 +442,15 @@ export class PlayerEngine {
   cursorSample(): { ctxTime: number; outputLatency: number; tabMs: number } | null {
     const clock = this.mp3.mp3?.clock()
     if (!clock) return null
+    // Sampled every few ms by the drift test: keep it cheap so the probe doesn't disturb what it measures.
+    if (this.tempoMsFor !== this.tempos) {
+      this.tempoMsFor = this.tempos
+      this.tempoMs = buildTickToMs(this.tempos)
+    }
     return {
       ctxTime: clock.now,
       outputLatency: clock.outputLatency,
-      tabMs: buildTickToMs(this.tempos)(this.api.tickPosition)
+      tabMs: this.tempoMs(this.api.tickPosition)
     }
   }
 
@@ -781,7 +788,7 @@ export class PlayerEngine {
       })
     })
 
-    api.playerFinished.on(() => set({ playing: false }))
+    api.playerFinished.on(() => set((s) => ({ playing: false, songEnded: s.songEnded + 1 })))
 
     api.error.on((e) => this.fail(e))
   }

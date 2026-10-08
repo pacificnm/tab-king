@@ -25,6 +25,23 @@ export interface SyncPointRow {
   mp3Ms: number
 }
 
+export interface PlaylistRow {
+  id: number
+  name: string
+  songCount: number
+}
+
+export interface AlbumHit extends AlbumRow {
+  artistName: string
+}
+
+/** Search results grouped by type (NAV-4). */
+export interface SearchResults {
+  songs: Song[]
+  albums: AlbumHit[]
+  artists: ArtistRow[]
+}
+
 export interface SongTrack {
   trackIndex: number
   name: string
@@ -57,6 +74,7 @@ export interface Song {
   syncPoints: SyncPointRow[]
   durationMs: number | null
   tracks: SongTrack[]
+  favorite: boolean
 }
 
 /** Fields supplied when creating or replacing a song. Paths are relative to the library folder. */

@@ -147,6 +147,7 @@ describe('validation and output', () => {
       synthSource: 'midi',
       syncOffsetMs: 120,
       syncPoints: [],
+      favorite: false,
       durationMs: 1000,
       tracks: [
         {

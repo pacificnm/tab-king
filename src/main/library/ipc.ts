@@ -4,12 +4,15 @@ import { z } from 'zod'
 import { IPC, SongFormSchema, SongMixSchema, SongSyncSchema } from '@shared/ipc-contract'
 import type { Id3Info, PickKind, Result } from '@shared/types'
 import type { LibraryRepo } from '../db/repo/library-repo'
+import type { PlaylistRepo } from '../db/repo/playlist-repo'
+import type { SearchRepo } from '../db/repo/search-repo'
 import { readId3 } from './id3'
 import type { PickedFiles } from './picked-files'
 import type { SongService } from './song-service'
 
 const id = z.number().int().positive()
 const name = z.string().trim().min(1).max(300)
+const playlistName = z.string().trim().min(1).max(200)
 const PickKindSchema = z.enum(['gp', 'midi', 'mp3'])
 
 const PICKERS: Record<PickKind, { title: string; filters: Electron.FileFilter[] }> = {
@@ -37,11 +40,19 @@ async function wrap<T>(fn: () => T | Promise<T>): Promise<Result<T>> {
 
 export interface LibraryIpcDeps {
   repo: LibraryRepo
+  searchRepo: SearchRepo
+  playlists: PlaylistRepo
   service: SongService
   picked: PickedFiles
 }
 
-export function registerLibraryIpc({ repo, service, picked }: LibraryIpcDeps): void {
+export function registerLibraryIpc({
+  repo,
+  searchRepo,
+  playlists,
+  service,
+  picked
+}: LibraryIpcDeps): void {
   const sender = (e: IpcMainInvokeEvent): BrowserWindow => {
     const win = BrowserWindow.fromWebContents(e.sender)
     if (!win) throw new Error('IPC from unknown sender')
@@ -132,6 +143,78 @@ export function registerLibraryIpc({ repo, service, picked }: LibraryIpcDeps): v
     wrap(() => {
       sender(e)
       repo.saveSync(id.parse(songId), SongSyncSchema.parse(sync))
+      return null
+    })
+  )
+  ipcMain.handle(
+    IPC.libListSongsByArtist,
+    (e, artistId) => (sender(e), repo.listSongsByArtist(id.parse(artistId)))
+  )
+  ipcMain.handle(
+    IPC.libSearch,
+    (e, text) => (sender(e), searchRepo.search(z.string().max(500).parse(text)))
+  )
+  ipcMain.handle(IPC.libListFavorites, (e) => (sender(e), repo.listFavorites()))
+  ipcMain.handle(IPC.libSetFavorite, (e, songId, favorite) =>
+    wrap(() => {
+      sender(e)
+      const state = repo.setFavorite(id.parse(songId), z.boolean().parse(favorite))
+      changed()
+      return state
+    })
+  )
+
+  const songIds = z.array(id).max(10_000)
+  ipcMain.handle(IPC.libPlaylistList, (e) => (sender(e), playlists.list()))
+  ipcMain.handle(
+    IPC.libPlaylistSongs,
+    (e, playlistId) => (sender(e), playlists.songs(id.parse(playlistId)))
+  )
+  ipcMain.handle(IPC.libPlaylistCreate, (e, name) =>
+    wrap(() => {
+      sender(e)
+      const created = playlists.create(playlistName.parse(name))
+      changed()
+      return created
+    })
+  )
+  ipcMain.handle(IPC.libPlaylistRename, (e, playlistId, name) =>
+    wrap(() => {
+      sender(e)
+      playlists.rename(id.parse(playlistId), playlistName.parse(name))
+      changed()
+      return null
+    })
+  )
+  ipcMain.handle(IPC.libPlaylistDelete, (e, playlistId) =>
+    wrap(() => {
+      sender(e)
+      playlists.delete(id.parse(playlistId))
+      changed()
+      return null
+    })
+  )
+  ipcMain.handle(IPC.libPlaylistAdd, (e, playlistId, ids) =>
+    wrap(() => {
+      sender(e)
+      const added = playlists.addSongs(id.parse(playlistId), songIds.parse(ids))
+      changed()
+      return added
+    })
+  )
+  ipcMain.handle(IPC.libPlaylistRemove, (e, playlistId, songId) =>
+    wrap(() => {
+      sender(e)
+      playlists.removeSong(id.parse(playlistId), id.parse(songId))
+      changed()
+      return null
+    })
+  )
+  ipcMain.handle(IPC.libPlaylistReorder, (e, playlistId, ids) =>
+    wrap(() => {
+      sender(e)
+      playlists.reorder(id.parse(playlistId), songIds.parse(ids))
+      changed()
       return null
     })
   )

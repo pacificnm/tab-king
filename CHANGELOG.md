@@ -2,6 +2,24 @@
 
 All notable changes to Tab King. Format: [Keep a Changelog](https://keepachangelog.com/), versions follow [SemVer](https://semver.org/).
 
+## [0.6.0] - 2026-10-08
+
+### Added
+
+- **Search**: type to search titles, artists, albums and genres (full-text, as-you-type with a 150 ms debounce, case- and accent-insensitive, prefix matching), with results grouped into songs, albums and artists. Open an album or artist from the results; Enter plays the first song.
+- **Favorites**: a heart on every song (tree, lists, song page) and a Favorites view, plus "Add to / Remove from favorites" in the song menu.
+- **Play lists**: create, rename and delete; add songs from a song's menu, from a searchable picker, or while creating; reorder by dragging or with ↑/↓ buttons; remove songs; play lists appear in the Play Lists branch of the tree with their own menu.
+- **Queue playback**: playing an album, artist, play list, favorites or search results queues it. The next song starts when one ends; Previous/Next song buttons and a position readout appear in the footer. Songs with a missing Guitar Pro file are skipped with a message.
+- SQLite migration 003: FTS5 search index kept in sync by triggers (back-filled for existing songs) and an index for play list order.
+- A 5,000-song performance check at the repository level and end to end: every query takes under 10 ms and the UI responds well inside 200 ms.
+
+### Changed
+
+- Double-clicking a song in the tree now plays it (the flyout stays open for 300 ms after a click so the second click lands on the same row).
+- Toggling a favorite from the tree's menu no longer closes the flyout.
+- Playing a single song queues its album so playback carries on through it.
+- Artists and Play Lists expand in place; Search and Favorites open views.
+
 ## [0.5.0] - 2026-10-08
 
 ### Added

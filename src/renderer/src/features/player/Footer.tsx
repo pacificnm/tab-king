@@ -1,4 +1,5 @@
 import { player, formatTime, usePlayerStore } from '../../player'
+import { hasSiblings } from '../../player/queue'
 import { MAX_SPEED, MIN_SPEED } from '../../player/player-math'
 
 const iconBtn =
@@ -10,10 +11,12 @@ const toggleBtn = (on: boolean): string =>
 
 interface Props {
   onShowPlayer: () => void
+  /** Skip to the previous/next song of the queue. */
+  onStepSong: (direction: 1 | -1) => void
 }
 
 /** Static transport footer (PLY-2…6). Always visible; controls are disabled until a song is ready. */
-export function Footer({ onShowPlayer }: Props): React.JSX.Element {
+export function Footer({ onShowPlayer, onStepSong }: Props): React.JSX.Element {
   const s = usePlayerStore()
   const ready = s.status === 'ready'
   const busy = s.playing || s.countingIn
@@ -78,6 +81,36 @@ export function Footer({ onShowPlayer }: Props): React.JSX.Element {
         <span className="w-20 text-sm tabular-nums text-fg-muted" aria-label="Measure">
           {s.measureCount > 0 ? `M${s.currentMeasure}/${s.measureCount}` : 'M–'}
         </span>
+        {hasSiblings(s.queue) && (
+          <div className="flex items-center gap-1" role="group" aria-label="Queue">
+            <button
+              type="button"
+              className={iconBtn}
+              aria-label="Previous song"
+              title={`Previous song (${s.queue.index + 1} of ${s.queue.songs.length} in ${s.queue.label})`}
+              disabled={s.queue.index === 0}
+              onClick={() => onStepSong(-1)}
+            >
+              ⏪
+            </button>
+            <span
+              className="w-14 text-center text-xs tabular-nums text-fg-muted"
+              aria-label="Queue position"
+            >
+              {s.queue.index + 1}/{s.queue.songs.length}
+            </span>
+            <button
+              type="button"
+              className={iconBtn}
+              aria-label="Next song"
+              title={`Next song (${s.queue.index + 1} of ${s.queue.songs.length} in ${s.queue.label})`}
+              disabled={s.queue.index >= s.queue.songs.length - 1}
+              onClick={() => onStepSong(1)}
+            >
+              ⏩
+            </button>
+          </div>
+        )}
         <button
           type="button"
           className="max-w-48 truncate text-left text-sm text-fg-muted hover:text-fg disabled:cursor-default"
