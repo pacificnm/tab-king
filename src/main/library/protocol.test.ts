@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('electron', () => ({ protocol: {} }))
-const { parseRange, relPathFromUrl } = await import('./protocol')
+const { parseRange, parseMediaUrl } = await import('./protocol')
+const relPathFromUrl = (u: string): string | null => parseMediaUrl(u)?.rel ?? null
 
 describe('relPathFromUrl', () => {
   it('decodes valid library URLs', () => {
@@ -25,6 +26,17 @@ describe('relPathFromUrl', () => {
       'not a url'
     ])
       expect(relPathFromUrl(u), u).toBeNull()
+  })
+})
+
+describe('parseMediaUrl', () => {
+  it('distinguishes the library and bundled-app hosts', () => {
+    expect(parseMediaUrl('tabking://app/soundfont/sonivox.sf3')).toEqual({
+      host: 'app',
+      rel: 'soundfont/sonivox.sf3'
+    })
+    expect(parseMediaUrl('tabking://library/a/b.gp')).toEqual({ host: 'library', rel: 'a/b.gp' })
+    expect(parseMediaUrl('tabking://evil/a')).toBeNull()
   })
 })
 

@@ -2,6 +2,31 @@
 
 All notable changes to Tab King. Format: [Keep a Changelog](https://keepachangelog.com/), versions follow [SemVer](https://semver.org/).
 
+## [0.3.0] - 2026-10-08
+
+### Added
+
+- Tab and notation rendering with a moving cursor, auto-scroll, and click-to-seek (alphaTab, pinned to 1.8.4).
+- Synth playback with a bundled GM SoundFont (Sonivox EAS, Apache-2.0) and bundled Bravura music font, served through the `tabking://app/` protocol host.
+- Static footer: play/pause, stop, previous/next measure, seek bar, time and measure readout.
+- Metronome with on/off and volume; 3-click count-in with on/off.
+- Select-and-loop: drag-select on the tab, type a bar range, or pick a section marker; Loop toggle; Clear selection.
+- Speed 25–200% in 5% steps with reset; master volume.
+- Keyboard shortcuts: Space, Home, `[` `]`, L, M, C.
+- Tab zoom (50–200%) and Page/Horizontal layout toggle.
+- `NOTICE` file with third-party attributions.
+- Player e2e scenarios, including a 2-bar loop at 60% with count-in.
+
+### Changed
+
+- Play (button, double-click, context menu, Enter) now opens the song in the player. Play on an artist or album opens its first song; queue playback arrives with playlists (M5).
+- Play is blocked with a clear message only when the Guitar Pro file is missing; a missing MP3 or cover no longer prevents playback.
+- The `tabking://` scheme is now CORS-enabled (the page origin is `file://`).
+
+### Notes
+
+- Instrument/MP3 modes, track mixing and MP3 sync arrive in M3/M4. Metronome, count-in, zoom and layout settings are not persisted yet (preferences land in M6).
+
 ## [0.2.0] - 2026-10-08
 
 ### Added

@@ -2,7 +2,7 @@ import { protocol } from 'electron'
 import { createReadStream, statSync } from 'node:fs'
 import { extname } from 'node:path'
 import { Readable } from 'node:stream'
-import type { LibraryStore } from './store'
+import { resolveWithin, type LibraryStore } from './store'
 
 export const SCHEME = 'tabking'
 
@@ -14,7 +14,11 @@ const MIME: Record<string, string> = {
   '.jpeg': 'image/jpeg',
   '.png': 'image/png',
   '.webp': 'image/webp',
-  '.gif': 'image/gif'
+  '.gif': 'image/gif',
+  '.woff2': 'font/woff2',
+  '.woff': 'font/woff',
+  '.sf3': 'application/octet-stream',
+  '.sf2': 'application/octet-stream'
 }
 
 /** Must run before `app.ready`. */
@@ -22,28 +26,39 @@ export function registerScheme(): void {
   protocol.registerSchemesAsPrivileged([
     {
       scheme: SCHEME,
-      privileges: { standard: true, secure: true, stream: true, supportFetchAPI: true }
+      privileges: {
+        standard: true,
+        secure: true,
+        stream: true,
+        supportFetchAPI: true,
+        corsEnabled: true
+      }
     }
   ])
 }
 
-/** Extract the library-relative path from `tabking://library/<relpath>`; null if the URL isn't valid. */
-export function relPathFromUrl(url: string): string | null {
+export type MediaHost = 'library' | 'app'
+
+/** Parse `tabking://library/<relpath>` (user files) or `tabking://app/<relpath>` (bundled assets); null if invalid. */
+export function parseMediaUrl(url: string): { host: MediaHost; rel: string } | null {
   let u: URL
   try {
     u = new URL(url)
   } catch {
     return null
   }
-  if (u.protocol !== `${SCHEME}:` || u.hostname !== 'library') return null
+  if (u.protocol !== `${SCHEME}:` || (u.hostname !== 'library' && u.hostname !== 'app')) return null
   try {
     const segs = u.pathname.split('/').slice(1).map(decodeURIComponent)
     if (segs.some((s) => s === '' || s === '.' || s === '..' || /[\\/\0]/.test(s))) return null
-    return segs.join('/')
+    return { host: u.hostname, rel: segs.join('/') }
   } catch {
     return null
   }
 }
+
+/** Only these bundled-resource folders may be read through the `app` host. */
+const APP_ALLOWED_PREFIXES = ['soundfont/', 'font/']
 
 /** Parse a single `bytes=a-b` Range header against a file size. Null = unsatisfiable/invalid. */
 export function parseRange(header: string, size: number): { start: number; end: number } | null {
@@ -63,14 +78,18 @@ export function parseRange(header: string, size: number): { start: number; end: 
   return { start, end }
 }
 
-export function registerLibraryProtocol(store: LibraryStore): void {
+export function registerLibraryProtocol(store: LibraryStore, resourcesDir: string): void {
   protocol.handle(SCHEME, (request) => {
-    const rel = relPathFromUrl(request.url)
-    if (!rel) return new Response('Bad request', { status: 400 })
+    const parsed = parseMediaUrl(request.url)
+    if (!parsed) return new Response('Bad request', { status: 400 })
+    if (parsed.host === 'app' && !APP_ALLOWED_PREFIXES.some((p) => parsed.rel.startsWith(p))) {
+      return new Response('Forbidden', { status: 403 })
+    }
     let abs: string
     let size: number
     try {
-      abs = store.resolve(rel)
+      abs =
+        parsed.host === 'app' ? resolveWithin(resourcesDir, parsed.rel) : store.resolve(parsed.rel)
       const st = statSync(abs)
       if (!st.isFile()) return new Response('Not found', { status: 404 })
       size = st.size
@@ -78,13 +97,18 @@ export function registerLibraryProtocol(store: LibraryStore): void {
       return new Response('Not found', { status: 404 })
     }
     const headers: Record<string, string> = {
+      // The page is served from file:// (or the dev server), a different origin from tabking://.
+      'Access-Control-Allow-Origin': '*',
       'Content-Type': MIME[extname(abs).toLowerCase()] ?? 'application/octet-stream',
       'Accept-Ranges': 'bytes'
     }
     const rangeHeader = request.headers.get('range')
     const range = rangeHeader ? parseRange(rangeHeader, size) : null
     if (rangeHeader && !range) {
-      return new Response(null, { status: 416, headers: { 'Content-Range': `bytes */${size}` } })
+      return new Response(null, {
+        status: 416,
+        headers: { 'Access-Control-Allow-Origin': '*', 'Content-Range': `bytes */${size}` }
+      })
     }
     const start = range?.start ?? 0
     const end = range?.end ?? size - 1

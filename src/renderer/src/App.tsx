@@ -1,16 +1,22 @@
-import { useCallback, useEffect, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import type { Song } from '@shared/types'
 import { ContextMenu, type ContextMenuItem } from './components/ContextMenu'
 import { Flyout } from './components/Flyout'
 import type { MenuAction } from './components/MenuBar'
 import { btnPrimary } from './components/Modal'
 import { TitleBar } from './components/TitleBar'
+import { usePlayerShortcuts } from './hooks/usePlayerShortcuts'
+import { player, usePlayerStore } from './player'
+import { Footer } from './features/player/Footer'
 import { menuFor, type LibraryAction, type MenuTarget } from './features/nav/actions'
 import { LibraryTree } from './features/nav/LibraryTree'
 import type { NavId } from './features/nav/tree-model'
 import { SongDetail } from './features/song/SongDetail'
 import { SongDialog } from './features/song/SongDialog'
 import { DeleteSongDialog, EditAlbumDialog, RenameArtistDialog } from './features/song/SmallDialogs'
+
+// alphaTab is large: load the tab view only once something is played.
+const TabView = lazy(() => import('./features/player/TabView'))
 
 const VIEW_TITLES: Record<NavId, string> = {
   search: 'Search',
@@ -39,6 +45,9 @@ export function App(): React.JSX.Element {
   const [ctx, setCtx] = useState<{ x: number; y: number; target: MenuTarget } | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [version, setVersion] = useState('')
+  const [showPlayer, setShowPlayer] = useState(false)
+  const playerOpened = usePlayerStore((s) => s.openToken > 0)
+  usePlayerShortcuts()
 
   useEffect(() => {
     void window.api.app.getInfo().then((i) => setVersion(i.version))
@@ -51,12 +60,14 @@ export function App(): React.JSX.Element {
 
   const onNav = useCallback((v: NavId) => {
     setSongId(null)
+    setShowPlayer(false)
     setView(v)
     if (v !== 'artists') setMenuOpen(false)
   }, [])
 
   const openSong = useCallback((song: Song) => {
     setSongId(song.id)
+    setShowPlayer(false)
     setMenuOpen(false)
   }, [])
 
@@ -65,19 +76,38 @@ export function App(): React.JSX.Element {
     setNotice(`"${action}" is not implemented yet`)
   }, [])
 
-  /** Playback ships in M2; for now verify the files so missing ones are reported clearly (LIB-8). */
-  const play = useCallback(async (target: MenuTarget | { kind: 'song'; song: Song }) => {
-    if (target.kind !== 'song') {
-      setNotice('Playback arrives in the next release')
+  /** Open a song in the player, first explaining any missing files (LIB-8). */
+  const playSong = useCallback(async (song: Song) => {
+    const missing = (await window.api.library.checkSong(song.id)).filter((c) => !c.exists)
+    if (missing.some((m) => m.label === 'Guitar Pro file')) {
+      setNotice(`Can't play "${song.title}": missing ${missing.map((m) => m.label).join(', ')}`)
       return
     }
-    const missing = (await window.api.library.checkSong(target.song.id)).filter((c) => !c.exists)
-    setNotice(
-      missing.length > 0
-        ? `Can't play "${target.song.title}": missing ${missing.map((m) => m.label).join(', ')}`
-        : 'Playback arrives in the next release'
-    )
+    player.open(song, true)
+    setShowPlayer(true)
+    setMenuOpen(false)
   }, [])
+
+  /** Play an artist/album: opens its first song (queue playback arrives with playlists). */
+  const play = useCallback(
+    async (target: MenuTarget) => {
+      const lib = window.api.library
+      let songs: Song[] = []
+      if (target.kind === 'song') songs = [target.song]
+      else if (target.kind === 'album')
+        songs = await lib.listSongs(target.artist.id, target.album.id)
+      else if (target.kind === 'artist') {
+        const first = (await lib.listAlbums(target.artist.id))[0]
+        songs = first
+          ? await lib.listSongs(target.artist.id, first.id)
+          : await lib.listSongs(target.artist.id, null)
+      }
+      const first = songs[0]
+      if (first) await playSong(first)
+      else setNotice('Nothing to play yet')
+    },
+    [playSong]
+  )
 
   const runAction = useCallback(
     (a: LibraryAction) => {
@@ -130,41 +160,57 @@ export function App(): React.JSX.Element {
           activeSongId={songId}
           onNav={onNav}
           onOpenSong={openSong}
-          onPlaySong={(s) => void play({ kind: 'song', song: s })}
+          onPlaySong={(s) => void playSong(s)}
           onMenu={showMenu}
         />
       </Flyout>
 
-      <main className="flex min-h-0 flex-1 overflow-y-auto">
-        {songId !== null ? (
-          <SongDetail
-            songId={songId}
-            onEdit={(song) => setDialog({ kind: 'edit-song', song })}
-            onDelete={(song) => setDialog({ kind: 'delete-song', song })}
-            onPlay={(song) => void play({ kind: 'song', song })}
-            onGone={songGone}
-          />
-        ) : (
-          <div className="m-auto flex flex-col items-center gap-4 text-fg-muted">
-            <p>{view ? VIEW_TITLES[view] : `Tab King ${version && `v${version}`}`}</p>
-            {view && COMING_SOON[view] && <p className="text-sm">{COMING_SOON[view]}</p>}
-            {(view === null || view === 'artists') && (
-              <>
-                <button
-                  type="button"
-                  className={btnPrimary}
-                  onClick={() => setDialog({ kind: 'add' })}
-                >
-                  Add song…
-                </button>
-                <p className="text-sm">
-                  Open the menu (☰) and choose Artists to browse your library.
-                </p>
-              </>
-            )}
+      <main className="relative flex min-h-0 flex-1 overflow-y-auto">
+        {playerOpened && (
+          <div
+            className={`absolute inset-0 z-10 bg-bg ${showPlayer ? '' : 'pointer-events-none invisible'}`}
+            aria-hidden={!showPlayer}
+            inert={!showPlayer}
+          >
+            <Suspense fallback={<p className="p-4 text-fg-muted">Loading player…</p>}>
+              <TabView />
+            </Suspense>
           </div>
         )}
+        {/* Covered by the player while it's showing: inert so focus can't linger on hidden buttons. */}
+        <div className="flex min-h-0 w-full flex-1" inert={showPlayer}>
+          {songId !== null ? (
+            <SongDetail
+              songId={songId}
+              onEdit={(song) => setDialog({ kind: 'edit-song', song })}
+              onDelete={(song) => setDialog({ kind: 'delete-song', song })}
+              onPlay={(song) => void playSong(song)}
+              onGone={songGone}
+            />
+          ) : (
+            <div className="m-auto flex flex-col items-center gap-4 text-fg-muted">
+              <p>{view ? VIEW_TITLES[view] : `Tab King ${version && `v${version}`}`}</p>
+              {view && COMING_SOON[view] && <p className="text-sm">{COMING_SOON[view]}</p>}
+              {(view === null || view === 'artists') && (
+                <>
+                  <button
+                    type="button"
+                    className={btnPrimary}
+                    onClick={() => setDialog({ kind: 'add' })}
+                  >
+                    Add song…
+                  </button>
+                  <p className="text-sm">
+                    Open the menu (☰) and choose Artists to browse your library.
+                  </p>
+                </>
+              )}
+            </div>
+          )}
+        </div>
       </main>
+
+      <Footer onShowPlayer={() => setShowPlayer(true)} />
 
       {dialog?.kind === 'add' && (
         <SongDialog

@@ -110,15 +110,21 @@ Main region = alphaTab surface + track panel (collapsible, left or top). Static 
 [Metronome ◉] [Count-in ◉] [Loop ◉ + Select] [Speed 100% ▾] [Master vol]
 ```
 
-### 6.2 alphaTab integration (`src/renderer/player/`)
+### 6.2 alphaTab integration (`src/renderer/src/player/`)
 
-- `PlayerEngine` class wraps `AlphaTabApi`; React talks only to this wrapper (events → Zustand store).
-- Settings: `player.enablePlayer`, `enableCursor`, `enableUserInteraction`, SoundFont loaded from `resources/` via the media protocol; fonts/workers served from app bundle (no CDN).
-- Metronome: `api.metronomeVolume`; Count-in: `api.countInVolume` with 3 beats — both 0 when off.
-- Loop/select: user drags a range → `api.playbackRange`; `api.isLooping` toggles. Section click uses GP section markers.
-- Speed: `api.playbackSpeed` (0.25–2.0).
-- Tracks: `api.renderTracks([...])` to display chosen tracks; `api.changeTrackSolo/Mute/Volume` for mixing [TRK-2]. Selecting a single track = solo + render that track; deselect restores the full score [TRK-5].
-- Previous/Next: seek to previous/next measure start (or section when sections exist); queue-level song skip with Shift or when at ends [open question 2].
+- `PlayerEngine` (`player-engine.ts`) is the only code that touches `AlphaTabApi`. Components call the `player` controller in `index.ts` and read the Zustand `usePlayerStore`; alphaTab events are translated into store updates. The engine is created by the lazy-loaded `TabView` (alphaTab is ~2.3 MB, loaded on first Play) and attached to the controller; commands are no-ops until then.
+- Settings: `enablePlayer`, `enableCursor`, `enableUserInteraction`, `enableElementHighlighting`, `scrollMode: continuous` with the tab view's scroll container as `scrollElement`. The SoundFont is fetched from `tabking://app/soundfont/sonivox.sf3` and passed as bytes (`loadSoundFont`); Bravura loads from `tabking://app/font/` (`core.fontDirectory`). Nothing comes from a CDN.
+- **Media protocol hosts.** `tabking://library/<rel>` serves user files; `tabking://app/<rel>` serves bundled assets from `resources/`, restricted to the `soundfont/` and `font/` prefixes. Both send `Access-Control-Allow-Origin: *` and the scheme is registered `corsEnabled`, because the page origin is `file://` (production) or the Vite dev server.
+- **Bundling.** `@coderline/alphatab-vite` handles workers/worklets (its asset copying is off; we serve assets ourselves). The renderer config defines `__BASE__` so alphaTab recognises the Vite build — without it the render worker and audio worklet cannot be located. alphaTab is pinned to an exact version.
+- Position/measure: `playerPositionChanged` drives time and (when idle or seeking) the measure via the tick→measure table built from `tickCache`; `playedBeatChanged` gives the measure while playing, so repeats display correctly.
+- Metronome: `api.metronomeVolume` (0 when off). **Count-in** is our own (`count-in.ts`): exactly 3 Web Audio clicks (first accented) at the tempo of the current measure × speed, then `api.play()` is called on the beat where the music starts. alphaTab's built-in count-in is a full bar (4 clicks in 4/4), which does not match PLY-4, so `countInVolume` stays 0. The count-in is cancelled by Pause/Stop and is independent of the audio source (it will also precede MP3 playback).
+- Loop/select: alphaTab's click-drag selection sets `playbackRange` (reported via `playbackRangeChanged`). For keyboard/precise use the toolbar has **Bars [from]–[to] + Select**, and a **Section** picker built from GP section markers; both call `api.playbackRange`. `api.isLooping` is the footer **Loop** toggle; **Clear selection** resets the range. Looping and the range survive seeks.
+- Speed: `api.playbackSpeed`, 25–200% in 5% steps (`clampSpeed`/`stepSpeed`), Reset = 100%. The setting persists across songs within a session.
+- Zoom 50–200% (`display.scale`) and Page/Horizontal layout (`display.layoutMode`) re-render via `updateSettings()` + `render()`.
+- Shortcuts (`shortcuts.ts`, `usePlayerShortcuts`): Space play/pause, Home restart, `[` / `]` speed −/+5%, L loop, M metronome, C count-in. Ignored while typing, with modifiers, inside menus/trees/dialogs, and Space is left to a focused button.
+- Previous/Next seek to the previous/next **measure** start (`prevBarTick`/`nextBarTick`); Previous restarts the current measure unless within half a beat of its start. Click a note/beat to seek (alphaTab built-in).
+- When the player is showing, the library views underneath are `inert` so keyboard focus cannot linger on hidden controls.
+- Tracks: `api.renderTracks([...])` and `changeTrackSolo/Mute/Volume` arrive with M3.
 
 ### 6.3 Audio sources and MP3 engine [TRK-3/4, SYN-*]
 
@@ -156,7 +162,7 @@ Dialog sections: Appearance (theme), Locations (library, backup folder), Audio (
 
 - Project: Apache-2.0 (`LICENSE`, `NOTICE` file listing third-party attributions).
 - alphaTab MPL-2.0: unmodified use via npm is compatible; any modifications to alphaTab files must be published under MPL-2.0.
-- SoundFont: choose a permissively licensed GM SoundFont (candidate: check licenses of GeneralUser GS, FluidR3 (MIT-style), Sonatina) before bundling; record in NOTICE.
+- SoundFont: the Sonivox EAS GM bank (`resources/soundfont/sonivox.sf3`, from the alphaTab distribution, Apache-2.0 © Sonic Network Inc.). Its license text ships next to it and is recorded in `NOTICE`. The Bravura music font (SIL OFL 1.1) lives in `resources/font/`.
 - CI runs a license checker on production dependencies.
 
 ## 10. Testing
