@@ -16,7 +16,7 @@ jobs:
     outputs:
       version: ${{ steps.v.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - id: v
         name: Check version and changelog
         run: |
@@ -39,19 +39,25 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { name: linux-x64, os: ubuntu-24.04, args: --linux --x64 }
-          - { name: linux-arm64, os: ubuntu-24.04-arm, args: --linux --arm64 }
-          - { name: windows-x64, os: windows-latest, args: --win --x64 }
-          - { name: macos-x64, os: macos-15-intel, args: --mac --x64 }
-          - { name: macos-arm64, os: macos-latest, args: --mac --arm64 }
+          - { name: linux-x64, os: ubuntu-24.04, args: --linux --x64, target: 'linux x64' }
+          - {
+              name: linux-arm64,
+              os: ubuntu-24.04-arm,
+              args: --linux --arm64,
+              target: 'linux arm64'
+            }
+          - { name: windows-x64, os: windows-latest, args: --win --x64, target: 'win x64' }
+          - { name: macos-x64, os: macos-15-intel, args: --mac --x64, target: 'mac x64' }
+          - { name: macos-arm64, os: macos-latest, args: --mac --arm64, target: 'mac arm64' }
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      - run: npm run license:check
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
@@ -76,7 +82,23 @@ jobs:
           done
       - name: Package
         run: npx electron-builder ${{ matrix.args }} --publish never
-      - uses: actions/upload-artifact@v4
+      - name: Check the installers have the documented names
+        run: node scripts/check-artifacts.mjs ${{ matrix.target }}
+      - name: Install a virtual display (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+      - name: Smoke test the packaged app
+        shell: bash
+        env:
+          TABKING_STARTUP_BUDGET_MS: '15000'
+        run: |
+          export TABKING_EXE="$(node scripts/packaged-exe.mjs)"
+          if [ "$RUNNER_OS" = Linux ]; then
+            xvfb-run -a npx playwright test tests/e2e/smoke.spec.ts
+          else
+            npx playwright test tests/e2e/smoke.spec.ts
+          fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: tab-king-${{ matrix.name }}
           if-no-files-found: error
@@ -94,8 +116,8 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           path: dist
           merge-multiple: true

@@ -24,7 +24,7 @@ export async function launchApp(
   const app = await electron.launch(
     exe
       ? { executablePath: exe, args: ['--no-sandbox', userData], env }
-      : { args: ['out/main/index.js', userData], env }
+      : { args: ['out/main/index.js', userData, ...(process.env.CI ? ['--no-sandbox'] : [])], env }
   )
   return { app, page: await app.firstWindow() }
 }
