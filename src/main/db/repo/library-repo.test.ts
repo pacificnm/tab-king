@@ -195,6 +195,56 @@ describe('LibraryRepo', () => {
     expect(repo['db'].prepare('SELECT COUNT(*) c FROM sync_point').get()).toEqual({ c: 0 })
   })
 
+  it('hydrates tracks and sync points correctly for large lists (batched across chunks)', () => {
+    const ids: number[] = []
+    for (let i = 0; i < 1200; i++) {
+      const song = repo.createSong({
+        ...base,
+        title: `Song ${i}`,
+        gpPath: `x/${i}.gp`,
+        tracks: Array.from({ length: (i % 3) + 1 }, (_, t) => ({
+          trackIndex: t,
+          name: `T${i}-${t}`,
+          instrument: null,
+          mp3Path: null,
+          source: 'synth' as const,
+          volume: 1,
+          muted: false,
+          solo: false
+        }))
+      })
+      ids.push(song.id)
+      if (i % 100 === 0)
+        repo.saveSync(song.id, {
+          offsetMs: i,
+          points: [
+            { measure: 2, mp3Ms: i + 5 },
+            { measure: 9, mp3Ms: i + 50 }
+          ]
+        })
+    }
+    // reversed, so ordering by request (not by id) is checked too
+    const wanted = [...ids].reverse()
+    const songs = repo.getSongs(wanted)
+    expect(songs.map((s) => s.id)).toEqual(wanted)
+    songs.forEach((s) => {
+      const i = Number(s.title.slice(5))
+      expect(
+        s.tracks.map((t) => t.name),
+        s.title
+      ).toEqual(Array.from({ length: (i % 3) + 1 }, (_, t) => `T${i}-${t}`))
+      expect(s.syncPoints, s.title).toEqual(
+        i % 100 === 0
+          ? [
+              { measure: 2, mp3Ms: i + 5 },
+              { measure: 9, mp3Ms: i + 50 }
+            ]
+          : []
+      )
+    })
+    expect(repo.getSong(ids[0]!)).toEqual(songs[songs.length - 1])
+  })
+
   it('stores settings as JSON', () => {
     expect(repo.getSetting('x')).toBeUndefined()
     repo.setSetting('x', { a: 1 })

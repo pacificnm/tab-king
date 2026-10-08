@@ -6,7 +6,8 @@ import type {
   SongInput,
   SongMix,
   SongSync,
-  SongTrack
+  SongTrack,
+  SyncPointRow
 } from '@shared/types'
 
 interface SongDbRow {
@@ -47,6 +48,9 @@ const SONG_SELECT = `
   FROM song s
   JOIN artist ar ON ar.id = s.artist_id
   LEFT JOIN album al ON al.id = s.album_id`
+
+/** SQLite caps bound parameters per statement (32,766 on current builds); stay well under it. */
+const SQL_CHUNK = 500
 
 /** Every library file path (relative) that a song row references. */
 export function songFiles(song: Song): string[] {
@@ -99,7 +103,7 @@ export class LibraryRepo {
             )
             .all(albumId)
     ) as SongDbRow[]
-    return rows.map((r) => this.toSong(r))
+    return this.toSongs(rows)
   }
 
   /** All of an artist's songs: by album (year, then track), album-less songs last. */
@@ -111,7 +115,7 @@ export class LibraryRepo {
                   s.track_no IS NULL, s.track_no, s.title COLLATE NOCASE`
       )
       .all(artistId) as SongDbRow[]
-    return rows.map((r) => this.toSong(r))
+    return this.toSongs(rows)
   }
 
   /** Songs by id, in the order given; unknown ids are skipped. */
@@ -121,15 +125,12 @@ export class LibraryRepo {
       .prepare(`${SONG_SELECT} WHERE s.id IN (${ids.map(() => '?').join(',')})`)
       .all(...ids) as SongDbRow[]
     const byId = new Map(rows.map((r) => [r.id, r]))
-    return ids.flatMap((id) => {
-      const r = byId.get(id)
-      return r ? [this.toSong(r)] : []
-    })
+    return this.toSongs(ids.flatMap((id) => byId.get(id) ?? []))
   }
 
   /** Turn query rows (selected with {@link SONG_SELECT}'s columns) into songs. */
   songsFromRows(rows: unknown[]): Song[] {
-    return (rows as SongDbRow[]).map((r) => this.toSong(r))
+    return this.toSongs(rows as SongDbRow[])
   }
 
   /** Favorites, most recently added first (NAV-5). */
@@ -139,7 +140,7 @@ export class LibraryRepo {
         `${SONG_SELECT} JOIN favorite fav ON fav.song_id = s.id ORDER BY fav.created_at DESC, s.id DESC`
       )
       .all() as SongDbRow[]
-    return rows.map((r) => this.toSong(r))
+    return this.toSongs(rows)
   }
 
   /** Add or remove a favorite; returns the new state. */
@@ -154,7 +155,7 @@ export class LibraryRepo {
 
   getSong(id: number): Song | undefined {
     const row = this.db.prepare(`${SONG_SELECT} WHERE s.id = ?`).get(id) as SongDbRow | undefined
-    return row && this.toSong(row)
+    return row ? this.toSongs([row])[0] : undefined
   }
 
   /** Insert a song (creating artist/album as needed) in one transaction. */
@@ -377,24 +378,50 @@ export class LibraryRepo {
       DELETE FROM artist WHERE id NOT IN (SELECT artist_id FROM song);`)
   }
 
-  private toSong(r: SongDbRow): Song {
-    const tracks = (
-      this.db
+  /**
+   * Turn song rows into songs. Tracks and sync points are fetched for all of them in two queries per chunk, not two
+   * per song — a favorites list or play list of 1,000 songs would otherwise cost 2,000 extra round trips.
+   */
+  private toSongs(rows: SongDbRow[]): Song[] {
+    if (rows.length === 0) return []
+    const tracksBySong = new Map<number, SongTrack[]>()
+    const pointsBySong = new Map<number, SyncPointRow[]>()
+    for (let i = 0; i < rows.length; i += SQL_CHUNK) {
+      const ids = rows.slice(i, i + SQL_CHUNK).map((r) => r.id)
+      const marks = ids.map(() => '?').join(',')
+      const tracks = this.db
         .prepare(
-          'SELECT track_index, name, instrument, mp3_path, source, volume, muted, solo FROM song_track WHERE song_id = ? ORDER BY track_index'
+          `SELECT song_id, track_index, name, instrument, mp3_path, source, volume, muted, solo
+           FROM song_track WHERE song_id IN (${marks}) ORDER BY song_id, track_index`
         )
-        .all(r.id) as TrackDbRow[]
-    ).map((t) => ({
-      trackIndex: t.track_index,
-      name: t.name,
-      instrument: t.instrument,
-      mp3Path: t.mp3_path,
-      source: t.source,
-      volume: t.volume,
-      muted: t.muted === 1,
-      solo: t.solo === 1
-    }))
-    return {
+        .all(...ids) as (TrackDbRow & { song_id: number })[]
+      for (const t of tracks) {
+        const list = tracksBySong.get(t.song_id) ?? []
+        list.push({
+          trackIndex: t.track_index,
+          name: t.name,
+          instrument: t.instrument,
+          mp3Path: t.mp3_path,
+          source: t.source,
+          volume: t.volume,
+          muted: t.muted === 1,
+          solo: t.solo === 1
+        })
+        tracksBySong.set(t.song_id, list)
+      }
+      const points = this.db
+        .prepare(
+          `SELECT song_id, measure, mp3_ms AS mp3Ms FROM sync_point
+           WHERE song_id IN (${marks}) ORDER BY song_id, measure`
+        )
+        .all(...ids) as (SyncPointRow & { song_id: number })[]
+      for (const p of points) {
+        const list = pointsBySong.get(p.song_id) ?? []
+        list.push({ measure: p.measure, mp3Ms: p.mp3Ms })
+        pointsBySong.set(p.song_id, list)
+      }
+    }
+    return rows.map((r) => ({
       id: r.id,
       albumId: r.album_id,
       artistId: r.artist_id,
@@ -411,17 +438,10 @@ export class LibraryRepo {
       masterSource: r.master_source,
       synthSource: r.synth_source,
       syncOffsetMs: r.sync_offset_ms,
-      syncPoints: this.db
-        .prepare(
-          'SELECT measure, mp3_ms AS mp3Ms FROM sync_point WHERE song_id = ? ORDER BY measure'
-        )
-        .all(r.id) as {
-        measure: number
-        mp3Ms: number
-      }[],
+      syncPoints: pointsBySong.get(r.id) ?? [],
       durationMs: r.duration_ms,
-      tracks,
+      tracks: tracksBySong.get(r.id) ?? [],
       favorite: r.favorite === 1
-    }
+    }))
   }
 }
