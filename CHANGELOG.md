@@ -2,6 +2,30 @@
 
 All notable changes to Tab King. Format: [Keep a Changelog](https://keepachangelog.com/), versions follow [SemVer](https://semver.org/).
 
+## [1.0.0] - 2026-10-08
+
+First stable release. Everything from 0.2–0.7 (library, player, multi-track, synced MP3, search and play lists, preferences, backup/restore, help) plus the polish below.
+
+### Added
+
+- **Accessibility audit** in the end-to-end suite: axe-core checks WCAG 2.1 A/AA on every screen in all four themes, plus keyboard-only tests for menus, dialogs, tabs and the library tree.
+- **Start-up check**: the app reaches a usable window in about 0.4 s, with an empty or a 5,000-song library; a test holds it under the 3 s requirement.
+- **Packaged-app smoke test** on Linux, Windows and macOS, on every pull request and before every release, and a check that every installer has its documented file name.
+- **License audit**: `npm run license:check` fails the build if a production dependency isn't Apache-2.0-compatible; `THIRD_PARTY_LICENSES.md` lists them all.
+- CI now runs the whole end-to-end suite.
+- **Install guide** in the README (including the SmartScreen and macOS Gatekeeper prompts for the unsigned builds), screenshots, and a manual QA checklist (`docs/QA.md`).
+
+### Changed
+
+- The Windows portable build now has its own file name (`…-win-x64-portable.exe`) instead of overwriting the installer's.
+- GitHub Actions are pinned to commit SHAs.
+- NSIS installer: desktop and Start-menu shortcuts; Linux desktop entry has a comment and keywords.
+
+### Fixed
+
+- Screen readers: the favorite button on a song page and the per-track "Practice this track" buttons now have names that match their visible text (and no longer announce their state twice).
+- After choosing File or Help → an item that opens a dialog, closing the dialog puts keyboard focus back on the menu instead of losing it.
+
 ## [0.7.0] - 2026-10-08
 
 ### Added

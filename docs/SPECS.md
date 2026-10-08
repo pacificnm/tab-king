@@ -246,7 +246,10 @@ Preferences are not part of a backup. Under the e2e harness (`TABKING_E2E`) the 
 - Fixtures: GP and MIDI files and tag-only MP3s are generated programmatically (`tests/e2e/fixtures.ts`, via alphaTab's exporter/MIDI generator and a hand-built ID3v2 tag). Real audio fixtures — 24 s of 50 ms beeps every 500 ms (120 bpm) at three pitches — are checked in under `tests/fixtures/` (see its README for the ffmpeg command).
 - **Drift test** (`tests/e2e/drift.spec.ts`, SYN-4): a probe on the audio output records each beep as it reaches the listener; a trace of the cursor on the same clock gives the cursor position at that moment; the sync map says where the beep belongs. Real-time drift must stay ≤ 30 ms for the typical beep (90th percentile; a hard ceiling of 60 ms catches regressions while tolerating a rare main-thread stall, since the cursor is drawn on animation frames) for: 100%, 60% and 150% speed (and pitch preserved), a start offset with tempo-warping sync points, a speed change mid-play, seeking mid-play, and loop wraps. Beeps within a short window of a deliberate jump are skipped. Observed over repeated full runs: 90th percentile 6–23 ms, worst single beep ≤ 25 ms. The probe is only active when the harness sets `TABKING_E2E`.
 - **Manual check** for devices the harness can't cover (Bluetooth or high-latency outputs): play a song with an audible metronome-like recording and confirm the cursor lands on each click; Chromium's `outputLatency` is subtracted but some devices under-report it.
-- Run e2e with `npm run test:e2e` (builds first; needs a display, e.g. `xvfb-run`). Native file dialogs are stubbed from the main process. CI integration lands in M7.
+- Run e2e with `npm run test:e2e` (builds first; needs a display, e.g. `xvfb-run`). Native file dialogs are stubbed from the main process. CI runs the whole suite under `xvfb-run` (the `e2e` job).
+- **Accessibility [NFR-5]** (`tests/e2e/a11y.spec.ts`): the axe-core engine (run inside the page, since Electron can't open the second page `@axe-core/playwright` needs) audits against WCAG 2.0/2.1 A and AA on the home screen, library tree, song page, Search, Favorites, Play Lists, every Preferences tab, Backup, About, Help, the Add-song dialog and the player — in each of the four concrete themes — and must report no violations. Keyboard tests cover opening menus and dialogs without a mouse, focus staying inside a dialog, a visible focus ring, arrow-key tabs and tree navigation, and focus returning to the page when a dialog closes. Theme contrast is additionally enforced token by token (`tests/unit/themes.test.ts`). The tab sheet is alphaTab's canvas/SVG output; its content is not part of the audit. Screen-reader behaviour is on the manual checklist ([QA.md](QA.md)).
+- **Performance [NFR-2/3]** (`tests/e2e/smoke.spec.ts`, `scale.spec.ts`): time from launching the process to a usable window must be under 3 s (`TABKING_STARTUP_BUDGET_MS` loosens it on CI; measured here at ≈0.4 s empty and with 5,000 songs); tree and search with 5,000 songs stay under 200 ms. Raspberry Pi 5 is checked by hand ([QA.md](QA.md) item 15): the MP3 path's time-stretch runs as a WebAssembly audio worklet on the CPU, so that is where load matters.
+- **Packaged-app smoke test**: the same `smoke.spec.ts` is run against the unpacked app that `electron-builder` produces (`TABKING_EXE`, path from `scripts/packaged-exe.mjs`) on Linux, Windows and macOS, on every PR (`smoke` job) and in the release workflow before the installers are uploaded.
 
 ## 11. Build and release
 
@@ -265,14 +268,18 @@ Preferences are not part of a backup. Under the e2e harness (`TABKING_E2E`) the 
 
 ### 11.2 CI workflow (`.github/workflows/ci.yml`)
 
-On push/PR: `npm ci`, lint, typecheck, unit tests (Linux). Matrix smoke build (`electron-builder --dir`) added in M7.
+On push/PR, three jobs:
+
+- `check` (Linux): `npm ci`, formatting, `npm run license:check`, lint, typecheck, unit tests, build.
+- `e2e` (Linux, `xvfb-run`): the full Playwright suite; test results are uploaded on failure.
+- `smoke` (Linux, Windows, macOS): `npm run dist:dir`, then start the unpacked app and run `smoke.spec.ts` (it launches, reaches a usable window within the budget, reports the right version, and has a working database).
 
 ### 11.3 Release workflow (`.github/workflows/release.yml`)
 
 Triggers: `push` of tags `v*.*.*`, plus manual `workflow_dispatch` (build only, uploads artifacts, **no release**) for dry runs.
 
 1. **verify** job — checks the tag equals `v` + `package.json` version (fail otherwise), and that `CHANGELOG.md` has a section for it.
-2. **build** job — matrix over the table above (`fail-fast: false`): checkout, `actions/setup-node` (version from `.nvmrc`, npm cache), `npm ci`, lint/typecheck/test, `npx electron-builder --publish never`, upload the installers with `actions/upload-artifact` (one artifact per matrix entry). Permissions: `contents: read`.
+2. **build** job — matrix over the table above (`fail-fast: false`): checkout, `actions/setup-node` (version from `.nvmrc`, npm cache), `npm ci`, license check, lint/typecheck/test, `npx electron-builder --publish never`, `scripts/check-artifacts.mjs` (every installer exists under its documented name — AppImage `x86_64`/`arm64`, deb `amd64`/`arm64`, Windows installer and `-portable` exe, macOS dmg and zip), a smoke test of the unpacked app, then upload the installers with `actions/upload-artifact` (one artifact per matrix entry). Permissions: `contents: read`.
 3. **release** job (`needs: [verify, build]`, only on tag push) — downloads all artifacts, writes `SHA256SUMS.txt`, extracts the CHANGELOG section as notes, and runs `gh release create <tag> --verify-tag --notes-file … files…`. Permissions: `contents: write` for this job only. The release is **not** created if any matrix leg fails, so a release never ships a partial set of platforms.
 4. Pre-releases: tags containing a hyphen (`v1.2.0-rc.1`) are marked pre-release. Phase tags `v0.x.0` are normal releases, so GitHub's `releases/latest` (used by the in-app update check, ABT-2) works throughout.
 
@@ -282,7 +289,9 @@ Re-running: deleting a failed tag/release and re-pushing the tag, or re-running 
 
 - v1.0 ships **unsigned**; SHA256SUMS published. README documents the Windows SmartScreen prompt and macOS "open anyway"/`xattr -d com.apple.quarantine` steps. macOS arm64 builds are ad-hoc signed (required to run).
 - The workflow reads optional secrets (`CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`, `WIN_CSC_LINK`) — when present electron-builder signs/notarizes; when absent it builds unsigned. No code change needed later to enable signing.
-- Third-party actions pinned to major versions (SHA-pin in M7 hardening); no secrets exposed to PR builds.
+- Third-party actions are pinned to full commit SHAs (a trailing comment names the release); bump them deliberately. No secrets are exposed to PR builds: signing secrets are only read in the tag/dispatch release workflow.
+- File associations for `.gp*` and a `.desktop` MIME entry are not part of 1.0 (opening a file from the OS would need an "add this file" flow); files are added from the Add song dialog.
+- Installer details: NSIS is per-user with a choice of install folder and desktop and Start-menu shortcuts; the portable exe has its own file name; the deb declares its runtime libraries; the `.desktop` entry carries name, comment and keywords (category AudioVideo). One 1024 px icon (`build/icon.png`) is converted by electron-builder for every platform.
 
 ### 11.5 Versioning
 

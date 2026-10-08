@@ -3,7 +3,8 @@ Copyright 2026 Jaimie Garner
 Licensed under the Apache License, Version 2.0.
 
 This product bundles or depends on the following third-party works. Full license
-texts ship with each package or are linked below. (A complete audit is part of M7.)
+texts ship with each package or are linked below. THIRD_PARTY_LICENSES.md lists every bundled
+production package with its license; `npm run license:check` verifies them in CI.
 
 Bundled assets
 --------------
@@ -28,3 +29,8 @@ zod                               MIT
 signalsmith-stretch               MIT       https://signalsmith-audio.co.uk/code/stretch/
 yazl (zip writer)                 MIT       https://github.com/thejoshwolfe/yazl
 yauzl (zip reader)                MIT       https://github.com/thejoshwolfe/yauzl
+
+Electron includes Chromium and other components under their own licenses; the full
+text ships with every build as LICENSES.chromium.html next to the executable.
+
+alphaTab is used unmodified from npm (MPL-2.0 applies to its own files only).
