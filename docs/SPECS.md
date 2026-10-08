@@ -41,7 +41,8 @@ docs/ tests/
 - `BrowserWindow({ frame: false, titleBarStyle: 'hidden' })`; on macOS keep `trafficLightPosition` hidden and draw our own buttons for consistency.
 - Title bar: `-webkit-app-region: drag`; interactive children `no-drag`. Buttons call `window.api.win.{minimize,toggleMaximize,close}`.
 - Resizing: frameless windows resize natively on Windows/macOS; on Linux add invisible 4 px resize handles if the WM doesn't provide them (verify per WM).
-- Left flyout: React slide-in panel (≈280 px) over content with backdrop; menu tree File/Help; focus-trapped, Esc closes.
+- Title bar order: hamburger · app title · menu bar (File, Help) · drag space · window buttons. The menu bar (`MenuBar`) is an ARIA `menubar` with drop-down `menu`s: File → Preferences, Backup / Restore; Help → Help Contents, About. Arrow keys move between items/menus, Enter activates, Esc closes; hovering another top-level item while one is open switches menus.
+- Left flyout (`Flyout` + `NavMenu`): React slide-in panel (≈280 px) over content with backdrop; contains library navigation only (Search, Play Lists, Favorites, Artists); focus-trapped, Esc closes.
 - Right help flyout: slide-in panel with TOC list (from `resources/help/toc.json`) and rendered Markdown (react-markdown).
 - Window bounds saved to `settings` (debounced).
 
@@ -72,6 +73,7 @@ song_fts  -- FTS5 virtual table over title, artist, album, genre; kept in sync b
 ## 4. Library and ID3 [LIB-*]
 
 Add flow (dialog, also used by Edit):
+
 1. Pick GP file (required) → parse with alphaTab (in renderer) for title, artist, album, tracks → prefill.
 2. Pick optional MIDI, master MP3, and per-track MP3s (one row per GP track).
 3. Main reads master MP3 ID3 via music-metadata (title, artist, album, year, track, genre, picture); ID3 overrides GP metadata for prefill; user can edit.
@@ -81,14 +83,15 @@ Context menus [NAV-3]: Artist → Add song, Edit artist (rename), Play all. Albu
 
 ## 5. Navigation UI [NAV-*]
 
-- Sidebar top-level: Search, Play List, Favorites, Artist. Lazy-loaded tree for Artist → Album → Song with virtualization (react-window) [NFR-3].
+- Flyout top-level, in order: Search, Play Lists, Favorites, Artists. Lazy-loaded tree for Artist → Album → Song with virtualization (react-window) [NFR-3].
 - Search: input with 150 ms debounce → `song_fts MATCH` with prefix queries; results grouped Songs / Albums / Artists.
 - Playlists: drag-and-drop reorder; Play starts a queue.
 - Double-click a song or Play opens it in the player and sets queue context (album/playlist/search).
 
-## 6. Player [PLY-*, TRK-*]
+## 6. Player [PLY-_, TRK-_]
 
 ### 6.1 Layout
+
 Main region = alphaTab surface + track panel (collapsible, left or top). Static footer, always visible:
 
 ```
@@ -97,6 +100,7 @@ Main region = alphaTab surface + track panel (collapsible, left or top). Static 
 ```
 
 ### 6.2 alphaTab integration (`src/renderer/player/`)
+
 - `PlayerEngine` class wraps `AlphaTabApi`; React talks only to this wrapper (events → Zustand store).
 - Settings: `player.enablePlayer`, `enableCursor`, `enableUserInteraction`, SoundFont loaded from `resources/` via the media protocol; fonts/workers served from app bundle (no CDN).
 - Metronome: `api.metronomeVolume`; Count-in: `api.countInVolume` with 3 beats — both 0 when off.
@@ -106,15 +110,17 @@ Main region = alphaTab surface + track panel (collapsible, left or top). Static 
 - Previous/Next: seek to previous/next measure start (or section when sections exist); queue-level song skip with Shift or when at ends [open question 2].
 
 ### 6.3 Audio sources and MP3 engine [TRK-3/4, SYN-*]
+
 Per track and for master, `source ∈ {synth, mp3}`.
 
 - **Synth source:** alphaTab's built-in synth; track's MIDI channel unmuted.
-- **MP3 source:** alphaTab's *external media* mode (`ExternalMediaHandler`/backing-track sync): our `Mp3Engine` owns `AudioContext` buffers for the master + stems and implements `play/pause/seek/rate/volume`, reporting its time to alphaTab. alphaTab maps MP3 time → tick via the song's **sync points** (`FlatSyncPoint[]`: bar index, modified tempo, millisecond offset), which handles tempo drift.
+- **MP3 source:** alphaTab's _external media_ mode (`ExternalMediaHandler`/backing-track sync): our `Mp3Engine` owns `AudioContext` buffers for the master + stems and implements `play/pause/seek/rate/volume`, reporting its time to alphaTab. alphaTab maps MP3 time → tick via the song's **sync points** (`FlatSyncPoint[]`: bar index, modified tempo, millisecond offset), which handles tempo drift.
 - Mixing rule: for each track, exactly one source is audible. Master MP3 on → synth tracks muted unless a track explicitly uses synth; stem MP3 selected → master MP3 muted for that instrument's solo view. Concretely the engine computes `audibleSet` on every change; unit tested.
 - **Speed:** synth via `playbackSpeed`; MP3 via time-stretch with pitch preservation (`AudioBufferSourceNode.playbackRate` + SoundTouch/`soundtouchjs` worklet, or `HTMLAudioElement.preservesPitch`). Spike required in M4 to pick; acceptance = no audible pitch change from 50%–150%.
 - All stems must be decoded to the same sample rate/length alignment; one shared clock (`AudioContext.currentTime`) drives all stems so they stay sample-aligned. Target drift ≤ 30 ms [SYN-4].
 
 ### 6.4 Sync model [SYN-1/2/3/5]
+
 - `sync_offset_ms`: mp3 time at bar 1 beat 1.
 - `sync_point(measure, mp3_ms)`: ascending in measure. Between points, tempo is linearly interpolated so measure N lands on `mp3_ms`. Before the first point use the offset; after the last, extrapolate with the last segment's ratio.
 - Conversion functions `measureToMp3Ms` / `mp3MsToMeasure` live in `sync-map.ts`, pure and unit tested (round-trip, monotonicity, negative offset).
@@ -123,15 +129,16 @@ Per track and for master, `source ∈ {synth, mp3}`.
 ## 7. Preferences [PRF-*]
 
 Dialog sections: Appearance (theme), Locations (library, backup folder), Audio (output device via `setSinkId`, defaults, SoundFont), About app data (DB path, size).
+
 - Themes: CSS variables on `<html data-theme>`; Tailwind config maps colors to variables. Built-ins: light, dark, system, "midnight" (blue), "amber".
 - Changing library folder: confirm, copy files, update `settings.library_dir`, verify, then offer to remove old files.
 - Default locations: `app.getPath('userData')` for DB; `~/Music/TabKing` for library; `~/Documents/TabKing Backups`.
 
-## 8. Backup / restore, help, about [BKP-*, HLP-*, ABT-*]
+## 8. Backup / restore, help, about [BKP-_, HLP-_, ABT-*]
 
 - Backup: SQLite `VACUUM INTO` temp file → zip (archiver) with `manifest.json {appVersion, schemaVersion, createdAt}`, `tabking.db`, `library/**`. Progress events to UI.
 - Restore: validate zip + manifest (schema ≤ app's), close DB, extract to temp dir, swap with the current data (kept as `.bak` until success), reopen and run migrations; on error roll back.
-- Help: `resources/help/*.md` + `toc.json`; right flyout with TOC and article view.
+- Help Contents: `resources/help/*.md` + `toc.json`; right flyout with TOC and article view.
 - About modal: name, version (`app.getVersion()`), license, repo link. **Check for updates** → main calls `GET https://api.github.com/repos/pacificnm/tab-king/releases/latest`, compares semver with `app.getVersion()`, returns `{upToDate, latest, url}`; errors shown inline. Only on click.
 
 ## 9. Licensing and third-party
@@ -152,21 +159,24 @@ Dialog sections: Appearance (theme), Locations (library, backup folder), Audio (
 ## 11. Build and release
 
 ### 11.1 Packaging
+
 - electron-builder (`electron-builder.yml`), `npm run dist` builds for the host OS/arch only; native modules (better-sqlite3) are rebuilt per target by building **on a runner of that architecture** (no cross-compiling).
 - Artifact names: `tab-king-<version>-<os>-<arch>.<ext>`.
 
-| Target | Runner | Arch | Artifacts |
-| --- | --- | --- | --- |
-| Linux | `ubuntu-24.04` | x64 | AppImage, deb |
-| Linux | `ubuntu-24.04-arm` | arm64 | AppImage, deb |
-| Windows | `windows-latest` | x64 | NSIS installer (.exe), portable .exe |
-| macOS | `macos-15-intel` | x64 | dmg, zip |
-| macOS | `macos-latest` | arm64 | dmg, zip |
+| Target  | Runner             | Arch  | Artifacts                            |
+| ------- | ------------------ | ----- | ------------------------------------ |
+| Linux   | `ubuntu-24.04`     | x64   | AppImage, deb                        |
+| Linux   | `ubuntu-24.04-arm` | arm64 | AppImage, deb                        |
+| Windows | `windows-latest`   | x64   | NSIS installer (.exe), portable .exe |
+| macOS   | `macos-15-intel`   | x64   | dmg, zip                             |
+| macOS   | `macos-latest`     | arm64 | dmg, zip                             |
 
 ### 11.2 CI workflow (`.github/workflows/ci.yml`)
+
 On push/PR: `npm ci`, lint, typecheck, unit tests (Linux). Matrix smoke build (`electron-builder --dir`) added in M7.
 
 ### 11.3 Release workflow (`.github/workflows/release.yml`)
+
 Triggers: `push` of tags `v*.*.*`, plus manual `workflow_dispatch` (build only, uploads artifacts, **no release**) for dry runs.
 
 1. **verify** job — checks the tag equals `v` + `package.json` version (fail otherwise), and that `CHANGELOG.md` has a section for it.
@@ -177,25 +187,27 @@ Triggers: `push` of tags `v*.*.*`, plus manual `workflow_dispatch` (build only, 
 Re-running: deleting a failed tag/release and re-pushing the tag, or re-running failed jobs, is safe because release creation is the last step.
 
 ### 11.4 Signing and trust
+
 - v1.0 ships **unsigned**; SHA256SUMS published. README documents the Windows SmartScreen prompt and macOS "open anyway"/`xattr -d com.apple.quarantine` steps. macOS arm64 builds are ad-hoc signed (required to run).
 - The workflow reads optional secrets (`CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`, `WIN_CSC_LINK`) — when present electron-builder signs/notarizes; when absent it builds unsigned. No code change needed later to enable signing.
 - Third-party actions pinned to major versions (SHA-pin in M7 hardening); no secrets exposed to PR builds.
 
 ### 11.5 Versioning
+
 SemVer in `package.json`; the phase tag table in PROJECT_PLAN gives each milestone's version. Bumping the version and CHANGELOG is part of each phase's wrap-up issue.
 
 ## 12. Milestones
 
-| M | Deliverable | Acceptance |
-| --- | --- | --- |
-| M0 | Scaffold, CI, **release pipeline (all 5 build targets)**, frameless window, title bar, left flyout, theme tokens | App launches on Linux; menu flyout works; lint/test green; tagged v0.1.0 produces a GitHub Release with installers for every target |
-| M1 | DB + migrations, library store, Add/Edit song w/ ID3, Artist tree, context menus | Add a song with GP+MP3; appears under Artist→Album→Song |
-| M2 | alphaTab render + synth playback, footer controls, metronome, count-in, loop/select, speed | Play a GP file; loop 4 bars at 60% with count-in |
-| M3 | Multi-track panel: solo/mute/volume, per-track view | Play each track separately |
-| M4 | MP3 engine, offset + sync points, sync editor, stems, source selector, pitch-preserved speed | MP3 and cursor within 30 ms over a full song; stems switch |
-| M5 | Search (FTS), playlists, favorites, queue | Search finds by artist/album/title |
-| M6 | Preferences, backup/restore, help flyout, about + update check | Backup→wipe→restore round trip passes |
-| M7 | Packaging, release workflow, polish, a11y pass | Installers build on all 3 OSes |
+| M   | Deliverable                                                                                                                                  | Acceptance                                                                                                                          |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| M0  | Scaffold, CI, **release pipeline (all 5 build targets)**, frameless window, title bar with File/Help menu bar, left nav flyout, theme tokens | App launches on Linux; menu flyout works; lint/test green; tagged v0.1.0 produces a GitHub Release with installers for every target |
+| M1  | DB + migrations, library store, Add/Edit song w/ ID3, Artist tree, context menus                                                             | Add a song with GP+MP3; appears under Artist→Album→Song                                                                             |
+| M2  | alphaTab render + synth playback, footer controls, metronome, count-in, loop/select, speed                                                   | Play a GP file; loop 4 bars at 60% with count-in                                                                                    |
+| M3  | Multi-track panel: solo/mute/volume, per-track view                                                                                          | Play each track separately                                                                                                          |
+| M4  | MP3 engine, offset + sync points, sync editor, stems, source selector, pitch-preserved speed                                                 | MP3 and cursor within 30 ms over a full song; stems switch                                                                          |
+| M5  | Search (FTS), playlists, favorites, queue                                                                                                    | Search finds by artist/album/title                                                                                                  |
+| M6  | Preferences, backup/restore, help flyout, about + update check                                                                               | Backup→wipe→restore round trip passes                                                                                               |
+| M7  | Packaging, release workflow, polish, a11y pass                                                                                               | Installers build on all 3 OSes                                                                                                      |
 
 ## 13. Risks
 
