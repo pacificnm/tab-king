@@ -36,8 +36,21 @@ export function resolveWithin(root: string, rel: string): string {
 
 /** Managed library folder: all song files live under `root`; callers deal in relative POSIX paths. */
 export class LibraryStore {
-  constructor(readonly root: string) {
+  private dir: string
+
+  constructor(root: string) {
     mkdirSync(root, { recursive: true })
+    this.dir = root
+  }
+
+  get root(): string {
+    return this.dir
+  }
+
+  /** Point the store at another folder (the user moved the library, PRF-2). */
+  setRoot(root: string): void {
+    mkdirSync(root, { recursive: true })
+    this.dir = root
   }
 
   /** Absolute path for a relative one; throws if it would escape the library folder. */
