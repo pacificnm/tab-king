@@ -4,7 +4,7 @@ A desktop guitar tab player in the spirit of [Songsterr](https://www.songsterr.c
 
 Single-user, offline-first, open source (Apache-2.0).
 
-> Status: **specification phase**. No code yet. See [docs/](docs/).
+> Status: **in development** (v0.2.0: library — add/edit/delete songs, Artist → Album → Song browsing). Playback arrives in M2. See [docs/](docs/) and [CHANGELOG.md](CHANGELOG.md).
 
 ## Features (planned)
 
@@ -42,6 +42,7 @@ Requires Node 22 (see `.nvmrc`).
 npm install
 npm run dev          # run with hot reload
 npm test             # unit tests (Vitest)
+npm run test:e2e     # Electron end-to-end tests (Playwright; needs a display)
 npm run lint && npm run typecheck
 npm run dist:dir     # unpacked package for the host platform
 npm run dist         # installers for the host platform

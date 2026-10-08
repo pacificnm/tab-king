@@ -77,7 +77,18 @@ Add flow (dialog, also used by Edit):
 1. Pick GP file (required) → parse with alphaTab (in renderer) for title, artist, album, tracks → prefill.
 2. Pick optional MIDI, master MP3, and per-track MP3s (one row per GP track).
 3. Main reads master MP3 ID3 via music-metadata (title, artist, album, year, track, genre, picture); ID3 overrides GP metadata for prefill; user can edit.
-4. On Save, in one operation: copy files to `<library>/<Artist>/<Album>/<Title>/…` (sanitised, collision-suffixed), write cover to `cover.jpg`, insert rows in a transaction; on any failure remove copied files and roll back.
+4. On Save, in one operation: copy files to `<library>/<Artist>/<Album>/<Title>/…` (sanitised, collision-suffixed), write the cover to `<library>/<Artist>/<Album>/cover.<ext>` (extension from the embedded picture's MIME type), insert rows in a transaction; on any failure remove copied files and roll back.
+
+Implementation notes (M1):
+
+- **File tokens.** The native picker runs in main; the renderer receives opaque `{token, name}` pairs, never paths, and passes tokens back on save. Main resolves tokens only from its own registry (`PickedFiles`), so the renderer cannot make main read or copy arbitrary paths. Existing files are referenced as `{existing: relPath}` and must belong to the song being edited.
+- **Edit keeps files in place.** Changing artist/album/title does not move files (DB paths stay valid); newly added files go into the song's existing folder. Replaced/removed files are deleted after the DB update succeeds; empty folders are pruned.
+- **Covers belong to albums.** A song without an album has no cover. Cover choices on save: `keep`, `id3` (extract from the newly picked master MP3), `none`. A cover file is removed when its album is pruned.
+- **Song tracks.** One `song_track` row is stored per GP track (name, instrument family, optional MP3), so later phases need no re-parse.
+- **Errors.** Add/update/delete/read operations return `Result<T>` (`{ok:true,value}` / `{ok:false,error}`) so failures surface as readable messages; nothing throws across IPC for expected failures.
+- **Missing files [LIB-8].** `checkSong` reports which of a song's files are absent. The song view lists them with a banner; Play refuses with a message naming what is missing; cover `<img>` errors fall back to the placeholder; the `tabking://` handler returns 404.
+- **Media protocol.** `tabking://library/<relpath>`: each path segment is URL-decoded and rejected if empty, `.`/`..` or contains `/`, `\` or NUL; the store then re-checks containment. Single `Range` requests return `206`; unsatisfiable ranges return `416`.
+- **Native module.** `better-sqlite3` 13 ships N-API prebuilds (one binary for Node and Electron), so there is no Electron rebuild step and Vitest tests run against the real driver.
 
 Context menus [NAV-3]: Artist → Add song, Edit artist (rename), Play all. Album → Add song, Edit, Play. Song → Edit, Play, Add to playlist, Favorite, Delete. Playlist → Add, Rename, Play, Delete. "Add" opens the Add dialog preset with that artist/album.
 
@@ -154,7 +165,8 @@ Dialog sections: Appearance (theme), Locations (library, backup folder), Audio (
 - Integration: migrations from empty and from each prior version; backup→restore round trip.
 - E2E (Playwright-Electron): add song, browse tree, play/loop, preferences theme, backup/restore, about/update (mocked GitHub).
 - Manual checklist per platform for frameless window behavior and audio devices.
-- Fixtures: small royalty-free GP file + short MP3s in `tests/fixtures/`.
+- Fixtures: GP files and tagged MP3s are generated programmatically (`tests/e2e/fixtures.ts`, via alphaTab's exporter and a hand-built ID3v2 tag), so no binary fixtures are checked in. Real audio fixtures for MP3 sync arrive with M4.
+- Run e2e with `npm run test:e2e` (builds first; needs a display, e.g. `xvfb-run`). Native file dialogs are stubbed from the main process. CI integration lands in M7.
 
 ## 11. Build and release
 

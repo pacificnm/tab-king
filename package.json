@@ -1,6 +1,6 @@
 {
   "name": "tab-king",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Desktop guitar tab player with Guitar Pro playback and synced MP3 tracks",
   "author": "Jaimie Garner <pacificnm@gmail.com>",
   "license": "Apache-2.0",
@@ -21,11 +21,14 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "dist": "npm run build && electron-builder --publish never",
-    "dist:dir": "npm run build && electron-builder --dir --publish never"
+    "dist:dir": "npm run build && electron-builder --dir --publish never",
+    "test:e2e": "npm run build && playwright test"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.64.0",
     "@tailwindcss/vite": "^4.3.3",
+    "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^26.6.4",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
@@ -44,9 +47,19 @@
     "vitest": "^5.0.3"
   },
   "dependencies": {
+    "@coderline/alphatab": "^1.8.4",
     "@electron-toolkit/utils": "^4.0.0",
+    "better-sqlite3": "^13.0.3",
+    "music-metadata": "^12.0.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
+    "react-window": "^2.3.3",
     "zod": "^4.6.5"
+  },
+  "allowScripts": {
+    "electron-winstaller@5.4.0": true,
+    "esbuild@0.25.12": true,
+    "esbuild@0.28.2": true,
+    "better-sqlite3": false
   }
 }

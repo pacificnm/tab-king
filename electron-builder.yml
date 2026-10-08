@@ -11,7 +11,8 @@ files:
   - resources/**
   - '!**/*.map'
 asar: true
-npmRebuild: true
+# better-sqlite3 ships N-API prebuilds (one binary for Node and Electron), so no native rebuild is needed.
+npmRebuild: false
 linux:
   target: [AppImage, deb]
   category: AudioVideo
