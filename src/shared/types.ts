@@ -67,7 +67,7 @@ export interface SongInput {
 /** User-facing outcome of an operation that can fail for reasons the UI should explain (LIB-8). */
 export type Result<T> = { ok: true; value: T } | { ok: false; error: string }
 
-export type PickKind = 'gp' | 'midi' | 'mp3' | 'mp3-multi'
+export type PickKind = 'gp' | 'midi' | 'mp3'
 
 /** A file the user chose in the native picker. The renderer only ever holds an opaque token, not a path. */
 export interface PickedFile {

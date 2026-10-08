@@ -10,31 +10,22 @@ import type { SongService } from './song-service'
 
 const id = z.number().int().positive()
 const name = z.string().trim().min(1).max(300)
-const PickKindSchema = z.enum(['gp', 'midi', 'mp3', 'mp3-multi'])
+const PickKindSchema = z.enum(['gp', 'midi', 'mp3'])
 
-const PICKERS: Record<PickKind, { title: string; filters: Electron.FileFilter[]; multi: boolean }> =
-  {
-    gp: {
-      title: 'Choose a Guitar Pro file',
-      filters: [{ name: 'Guitar Pro', extensions: ['gp', 'gp3', 'gp4', 'gp5', 'gpx'] }],
-      multi: false
-    },
-    midi: {
-      title: 'Choose a MIDI file',
-      filters: [{ name: 'MIDI', extensions: ['mid', 'midi'] }],
-      multi: false
-    },
-    mp3: {
-      title: 'Choose an MP3 file',
-      filters: [{ name: 'MP3 audio', extensions: ['mp3'] }],
-      multi: false
-    },
-    'mp3-multi': {
-      title: 'Choose MP3 files',
-      filters: [{ name: 'MP3 audio', extensions: ['mp3'] }],
-      multi: true
-    }
+const PICKERS: Record<PickKind, { title: string; filters: Electron.FileFilter[] }> = {
+  gp: {
+    title: 'Choose a Guitar Pro file',
+    filters: [{ name: 'Guitar Pro', extensions: ['gp', 'gp3', 'gp4', 'gp5', 'gpx'] }]
+  },
+  midi: {
+    title: 'Choose a MIDI file',
+    filters: [{ name: 'MIDI', extensions: ['mid', 'midi'] }]
+  },
+  mp3: {
+    title: 'Choose an MP3 file',
+    filters: [{ name: 'MP3 audio', extensions: ['mp3'] }]
   }
+}
 
 async function wrap<T>(fn: () => T | Promise<T>): Promise<Result<T>> {
   try {
@@ -81,7 +72,7 @@ export function registerLibraryIpc({ repo, service, picked }: LibraryIpcDeps): v
     const res = await dialog.showOpenDialog(win, {
       title: p.title,
       filters: [...p.filters, { name: 'All files', extensions: ['*'] }],
-      properties: p.multi ? ['openFile', 'multiSelections'] : ['openFile']
+      properties: ['openFile']
     })
     return res.canceled ? [] : res.filePaths.map((f) => picked.add(f))
   })

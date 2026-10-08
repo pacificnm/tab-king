@@ -1,0 +1,60 @@
+import { exporter, importer, Settings } from '@coderline/alphatab'
+import { writeFileSync } from 'node:fs'
+import { join } from 'node:path'
+
+/** A valid 1x1 PNG used as embedded cover art. */
+export const PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+  'base64'
+)
+
+export function writeGp(dir: string, name: string): string {
+  const settings = new Settings()
+  const imp = new importer.AlphaTexImporter()
+  imp.initFromString(
+    '\\title "GP Title" \\artist "GP Artist" \\album "GP Album" \\track "Lead" 3.3.4*4 | 1.2.4*4 \\track "Bass" 1.3.1*4',
+    settings
+  )
+  const file = join(dir, name)
+  writeFileSync(file, new exporter.Gp7Exporter().export(imp.readScore(), settings))
+  return file
+}
+
+const be32 = (n: number): Buffer =>
+  Buffer.from([(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255])
+const syncsafe = (n: number): Buffer =>
+  Buffer.from([(n >>> 21) & 127, (n >>> 14) & 127, (n >>> 7) & 127, n & 127])
+const frame = (id: string, body: Buffer): Buffer =>
+  Buffer.concat([Buffer.from(id), be32(body.length), Buffer.from([0, 0]), body])
+const text = (id: string, s: string): Buffer =>
+  frame(id, Buffer.concat([Buffer.from([0]), Buffer.from(s, 'latin1')]))
+
+/** An MP3 file consisting of an ID3v2.3 tag with cover art (no audio frames needed for tag reading). */
+export function writeTaggedMp3(
+  dir: string,
+  name: string,
+  tags: { title: string; artist: string; album: string }
+): string {
+  const body = Buffer.concat([
+    text('TIT2', tags.title),
+    text('TPE1', tags.artist),
+    text('TALB', tags.album),
+    text('TYER', '1981'),
+    frame(
+      'APIC',
+      Buffer.concat([
+        Buffer.from([0]),
+        Buffer.from('image/png\0'),
+        Buffer.from([3]),
+        Buffer.from('\0'),
+        PNG
+      ])
+    )
+  ])
+  const file = join(dir, name)
+  writeFileSync(
+    file,
+    Buffer.concat([Buffer.from('ID3'), Buffer.from([3, 0, 0]), syncsafe(body.length), body])
+  )
+  return file
+}
