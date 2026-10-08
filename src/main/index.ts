@@ -1,5 +1,7 @@
 import { app, BrowserWindow } from 'electron'
 import { is } from '@electron-toolkit/utils'
+import { join } from 'node:path'
+import { openDatabase } from './db/connection'
 import { registerIpc } from './ipc'
 import { denyPermissions, installCsp, lockDownWebContents } from './security'
 import { SettingsStore } from './settings-store'
@@ -16,6 +18,7 @@ if (!app.requestSingleInstanceLock()) {
     installCsp(is.dev)
     denyPermissions()
     registerIpc()
+    openDatabase(join(app.getPath('userData'), 'library.db'))
     const settings = new SettingsStore()
     createMainWindow(settings)
 
