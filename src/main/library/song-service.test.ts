@@ -33,6 +33,7 @@ const form = (over: Partial<SongForm> = {}): SongForm => ({
   midi: null,
   masterMp3: null,
   masterSource: 'synth',
+  synthSource: 'gp',
   syncOffsetMs: 0,
   tracks: [],
   cover: 'none',
@@ -75,9 +76,20 @@ describe('SongService', () => {
             instrument: null,
             mp3: src('gtr.mp3'),
             source: 'mp3',
-            volume: 1
+            volume: 1,
+            muted: false,
+            solo: false
           },
-          { trackIndex: 1, name: 'Bass', instrument: null, mp3: null, source: 'mp3', volume: 1 }
+          {
+            trackIndex: 1,
+            name: 'Bass',
+            instrument: null,
+            mp3: null,
+            source: 'mp3',
+            volume: 1,
+            muted: false,
+            solo: false
+          }
         ]
       })
     )

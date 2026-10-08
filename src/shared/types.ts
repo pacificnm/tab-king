@@ -1,4 +1,6 @@
 export type AudioSource = 'synth' | 'mp3'
+/** Where the synth takes its notes from: the tab-derived MIDI or the attached MIDI file. */
+export type SynthSource = 'gp' | 'midi'
 
 export interface ArtistRow {
   id: number
@@ -22,7 +24,10 @@ export interface SongTrack {
   instrument: string | null
   mp3Path: string | null
   source: AudioSource
+  /** 1 = 100%. */
   volume: number
+  muted: boolean
+  solo: boolean
 }
 
 export interface Song {
@@ -40,6 +45,7 @@ export interface Song {
   midiPath: string | null
   masterMp3Path: string | null
   masterSource: AudioSource
+  synthSource: SynthSource
   syncOffsetMs: number
   durationMs: number | null
   tracks: SongTrack[]
@@ -59,6 +65,7 @@ export interface SongInput {
   midiPath?: string | null
   masterMp3Path?: string | null
   masterSource?: AudioSource
+  synthSource?: SynthSource
   syncOffsetMs?: number
   durationMs?: number | null
   tracks?: SongTrack[]
@@ -99,6 +106,8 @@ export interface TrackForm {
   mp3: FileRef
   source: AudioSource
   volume: number
+  muted: boolean
+  solo: boolean
 }
 
 /** What the Add/Edit dialog submits. */
@@ -114,9 +123,23 @@ export interface SongForm {
   midi: FileRef
   masterMp3: FileRef
   masterSource: AudioSource
+  synthSource: SynthSource
   syncOffsetMs: number
   tracks: TrackForm[]
   cover: CoverChoice
+}
+
+/** A track's mix state as saved from the track panel. */
+export interface TrackMix {
+  trackIndex: number
+  volume: number
+  muted: boolean
+  solo: boolean
+}
+
+export interface SongMix {
+  synthSource: SynthSource
+  tracks: TrackMix[]
 }
 
 export interface FileCheck {

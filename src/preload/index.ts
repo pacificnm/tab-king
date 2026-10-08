@@ -30,6 +30,7 @@ const api: TabKingApi = {
     deleteSong: (id, deleteFiles) => ipcRenderer.invoke(IPC.libDeleteSong, id, deleteFiles),
     renameArtist: (id, name) => ipcRenderer.invoke(IPC.libRenameArtist, id, name),
     updateAlbum: (id, title, year) => ipcRenderer.invoke(IPC.libUpdateAlbum, id, title, year),
+    saveMix: (songId, mix) => ipcRenderer.invoke(IPC.libSaveMix, songId, mix),
     checkSong: (id) => ipcRenderer.invoke(IPC.libCheckSong, id),
     onChanged: (cb) => {
       const listener = (): void => cb()

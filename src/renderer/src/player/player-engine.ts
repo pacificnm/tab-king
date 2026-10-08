@@ -1,4 +1,5 @@
 import { AlphaTabApi, LayoutMode, type model } from '@coderline/alphatab'
+import type { SongTrack, SynthSource } from '@shared/types'
 import { CountIn } from './count-in'
 import {
   barAtTick,
@@ -10,9 +11,22 @@ import {
   tempoAtBar,
   type BarSpan
 } from './player-math'
-import { usePlayerStore, type TabLayout } from './store'
+import { instrumentName } from './gp-metadata'
+import { clampTrackVolume, effectiveMix } from './mix-math'
+import { scheduleSaveMix } from './mix-persistence'
+import { spliceExternalMidi } from './midi-splice'
+import type { ParsedSmf } from './smf'
+import { usePlayerStore, type PanelTrack, type TabLayout } from './store'
 
 export const COUNT_IN_CLICKS = 3
+
+export interface LoadOptions {
+  /** Saved mix for the song's tracks, by track index. */
+  mix: readonly SongTrack[]
+  synthSource: SynthSource
+  /** The attached MIDI file, already parsed, if any. */
+  midi: ParsedSmf | null
+}
 
 const set = usePlayerStore.setState
 const get = usePlayerStore.getState
@@ -26,16 +40,26 @@ export class PlayerEngine {
   private readonly countIn = new CountIn()
   private spans: BarSpan[] = []
   private ready = false
-  private soundFontLoaded = false
   private destroyed = false
+  private freshLoad = false
+  private savedMix: readonly SongTrack[] = []
+  private midiFile: ParsedSmf | null = null
+  private afterRender: (() => void) | null = null
 
-  constructor(container: HTMLElement, scrollElement: HTMLElement, fontDirectory: string) {
+  constructor(
+    container: HTMLElement,
+    scrollElement: HTMLElement,
+    fontDirectory: string,
+    soundFontUrl: string
+  ) {
     const s = get()
     this.api = new AlphaTabApi(container, {
       core: { fontDirectory },
       display: { scale: s.zoom, layoutMode: s.layout },
       player: {
         enablePlayer: true,
+        // alphaTab sequences this against its own player/MIDI setup; loading bytes by hand raced with it.
+        soundFont: soundFontUrl,
         enableCursor: true,
         enableUserInteraction: true,
         enableElementHighlighting: true,
@@ -49,19 +73,15 @@ export class PlayerEngine {
     this.wire()
   }
 
-  /** Load the bundled SoundFont once; resolves when the synth can play. */
-  async loadSoundFont(url: string): Promise<void> {
-    const res = await fetch(url)
-    if (!res.ok) throw new Error('The bundled SoundFont could not be loaded')
-    this.api.loadSoundFont(new Uint8Array(await res.arrayBuffer()), false)
-    this.soundFontLoaded = true
-  }
-
-  /** Render a Guitar Pro file. Playback is ready when `status` becomes 'ready'. */
-  load(bytes: ArrayBuffer): void {
-    this.stop()
+  /** Render a Guitar Pro file (all tracks). Playback is ready when `status` becomes 'ready'. */
+  load(bytes: ArrayBuffer, opts: LoadOptions): void {
+    if (get().playing || get().countingIn) this.stop()
     this.ready = false
     this.spans = []
+    this.freshLoad = true
+    this.afterRender = null
+    this.savedMix = opts.mix
+    this.midiFile = opts.midi
     set({
       status: 'loading',
       error: null,
@@ -70,10 +90,14 @@ export class PlayerEngine {
       currentMeasure: 0,
       measureCount: 0,
       sections: [],
-      range: null
+      range: null,
+      tracks: [],
+      practiceTrack: null,
+      hasMidi: opts.midi !== null,
+      synthSource: opts.midi ? opts.synthSource : 'gp'
     })
     try {
-      this.api.load(new Uint8Array(bytes))
+      this.api.load(new Uint8Array(bytes), [-1])
     } catch (e) {
       this.fail(e)
     }
@@ -197,11 +221,94 @@ export class PlayerEngine {
     set({ layout })
   }
 
+  setTrackVolume(index: number, volume: number): void {
+    this.updateTrack(index, { volume: clampTrackVolume(volume) })
+  }
+
+  toggleMute(index: number): void {
+    const t = get().tracks.find((x) => x.index === index)
+    if (t) this.updateTrack(index, { muted: !t.muted })
+  }
+
+  toggleSolo(index: number): void {
+    const t = get().tracks.find((x) => x.index === index)
+    if (t) this.updateTrack(index, { solo: !t.solo })
+  }
+
+  /**
+   * Single-track practice view (TRK-5): render and play only this track; `null` restores the full score
+   * and the user's mix, which is never modified by the practice view.
+   */
+  setPractice(index: number | null): void {
+    const score = this.api.score
+    if (!score || !this.ready || index === get().practiceTrack) return
+    const track = index === null ? null : score.tracks[index]
+    if (index !== null && !track) return
+    const resume = get().playing
+    const tick = this.api.tickPosition
+    if (resume) this.api.pause()
+    set({ practiceTrack: index })
+    this.applyMix()
+    // Re-rendering resets the playback position; put the player back where it was afterwards.
+    this.afterRender = () => {
+      this.api.tickPosition = tick
+      if (resume) this.api.play()
+    }
+    this.api.renderTracks(track ? [track] : score.tracks)
+  }
+
+  /** Choose where the synth takes its notes from (TRK-6). No-op without a usable attached MIDI file. */
+  setSynthSource(source: SynthSource): void {
+    if (!this.midiFile && source === 'midi') return
+    if (source === get().synthSource) return
+    const resume = get().playing
+    const tick = this.api.tickPosition
+    if (resume) this.api.pause()
+    set({ synthSource: source })
+    scheduleSaveMix()
+    // Regenerate the MIDI; the midiLoad hook swaps the note events in when source is 'midi'.
+    this.api.loadMidiForScore()
+    this.afterRender = () => {
+      this.api.tickPosition = tick
+      if (resume) this.api.play()
+    }
+    if (this.ready) queueMicrotask(() => this.runAfterRender())
+  }
+
   destroy(): void {
     this.destroyed = true
     this.countIn.dispose()
     this.api.destroy()
     set({ playing: false, countingIn: false, status: 'idle' })
+  }
+
+  private runAfterRender(): void {
+    const cb = this.afterRender
+    this.afterRender = null
+    cb?.()
+  }
+
+  private updateTrack(index: number, patch: Partial<PanelTrack>): void {
+    set((s) => ({ tracks: s.tracks.map((t) => (t.index === index ? { ...t, ...patch } : t)) }))
+    this.applyMix()
+    scheduleSaveMix()
+  }
+
+  /** Push the effective mix (user mix, or the practice track alone) to the synth. */
+  private applyMix(): void {
+    const score = this.api.score
+    if (!score) return
+    const { tracks, practiceTrack } = get()
+    for (const m of effectiveMix(
+      tracks.map((t) => ({ index: t.index, volume: t.volume, muted: t.muted, solo: t.solo })),
+      practiceTrack
+    )) {
+      const track = score.tracks[m.index]
+      if (!track) continue
+      this.api.changeTrackVolume([track], m.volume)
+      this.api.changeTrackMute([track], m.mute)
+      this.api.changeTrackSolo([track], m.solo)
+    }
   }
 
   private applyMetronome(): void {
@@ -231,6 +338,27 @@ export class PlayerEngine {
         measureCount: score.masterBars.length,
         sections: sectionsFromMarkers(score.masterBars.map((b) => b.section?.text.trim() || null))
       })
+      // scoreLoaded also fires when re-rendering other tracks; only a fresh load builds the track list.
+      if (!this.freshLoad) return
+      this.freshLoad = false
+      const saved = new Map(this.savedMix.map((t) => [t.trackIndex, t]))
+      set({
+        tracks: score.tracks.map((t, i) => ({
+          index: i,
+          name: t.name.trim() || `Track ${i + 1}`,
+          instrument: instrumentName(
+            t.playbackInfo.program,
+            t.staves.some((st) => st.isPercussion)
+          ),
+          volume: saved.get(i)?.volume ?? 1,
+          muted: saved.get(i)?.muted ?? false,
+          solo: saved.get(i)?.solo ?? false
+        }))
+      })
+    })
+
+    api.midiLoad.on((file) => {
+      if (this.midiFile && get().synthSource === 'midi') spliceExternalMidi(file, this.midiFile)
     })
 
     api.playerReady.on(() => {
@@ -244,11 +372,18 @@ export class PlayerEngine {
       // A new score drops the old selection; restore the user's loop/speed/metronome settings.
       api.isLooping = get().loopOn
       api.playbackSpeed = get().speed
-      set({ status: 'ready', measureCount: this.spans.length, currentMeasure: 1 })
+      const first = get().status !== 'ready'
+      set({
+        status: 'ready',
+        measureCount: this.spans.length,
+        ...(first ? { currentMeasure: 1 } : {})
+      })
+      this.applyMix()
       if (get().autoplay) {
         set({ autoplay: false })
         this.play()
       }
+      this.runAfterRender()
     })
 
     api.playerStateChanged.on((e) => {

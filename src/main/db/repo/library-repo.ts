@@ -1,5 +1,5 @@
 import type { Db } from '../connection'
-import type { AlbumRow, ArtistRow, Song, SongInput, SongTrack } from '@shared/types'
+import type { AlbumRow, ArtistRow, Song, SongInput, SongMix, SongTrack } from '@shared/types'
 
 interface SongDbRow {
   id: number
@@ -16,6 +16,7 @@ interface SongDbRow {
   midi_path: string | null
   master_mp3_path: string | null
   master_source: 'synth' | 'mp3'
+  synth_source: 'gp' | 'midi'
   sync_offset_ms: number
   duration_ms: number | null
 }
@@ -27,6 +28,8 @@ interface TrackDbRow {
   mp3_path: string | null
   source: 'synth' | 'mp3'
   volume: number
+  muted: number
+  solo: number
 }
 
 const SONG_SELECT = `
@@ -101,8 +104,8 @@ export class LibraryRepo {
       const info = this.db
         .prepare(
           `INSERT INTO song (album_id, artist_id, title, track_no, genre, year, gp_path, midi_path,
-                             master_mp3_path, master_source, sync_offset_ms, duration_ms)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`
+                             master_mp3_path, master_source, synth_source, sync_offset_ms, duration_ms)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`
         )
         .run(
           albumId,
@@ -115,6 +118,7 @@ export class LibraryRepo {
           input.midiPath ?? null,
           input.masterMp3Path ?? null,
           input.masterSource ?? 'synth',
+          input.synthSource ?? 'gp',
           input.syncOffsetMs ?? 0,
           input.durationMs ?? null
         )
@@ -136,7 +140,7 @@ export class LibraryRepo {
       this.db
         .prepare(
           `UPDATE song SET album_id=?, artist_id=?, title=?, track_no=?, genre=?, year=?, gp_path=?,
-                  midi_path=?, master_mp3_path=?, master_source=?, sync_offset_ms=?, duration_ms=?,
+                  midi_path=?, master_mp3_path=?, master_source=?, synth_source=?, sync_offset_ms=?, duration_ms=?,
                   updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
            WHERE id=?`
         )
@@ -151,6 +155,7 @@ export class LibraryRepo {
           input.midiPath ?? null,
           input.masterMp3Path ?? null,
           input.masterSource ?? 'synth',
+          input.synthSource ?? 'gp',
           input.syncOffsetMs ?? 0,
           input.durationMs ?? null,
           id
@@ -223,6 +228,18 @@ export class LibraryRepo {
     return !!this.db.prepare('SELECT 1 FROM album WHERE id = ?').get(id)
   }
 
+  /** Save the track panel's mix. Only touches existing track rows, so it is safe against a concurrent edit. */
+  saveMix(songId: number, mix: SongMix): void {
+    this.db.transaction(() => {
+      this.db.prepare('UPDATE song SET synth_source = ? WHERE id = ?').run(mix.synthSource, songId)
+      const upd = this.db.prepare(
+        'UPDATE song_track SET volume = ?, muted = ?, solo = ? WHERE song_id = ? AND track_index = ?'
+      )
+      for (const t of mix.tracks)
+        upd.run(t.volume, t.muted ? 1 : 0, t.solo ? 1 : 0, songId, t.trackIndex)
+    })()
+  }
+
   getSetting<T>(key: string): T | undefined {
     const row = this.db.prepare('SELECT value FROM settings WHERE key = ?').get(key) as
       { value: string } | undefined
@@ -262,11 +279,21 @@ export class LibraryRepo {
   private replaceTracks(songId: number, tracks: SongTrack[]): void {
     this.db.prepare('DELETE FROM song_track WHERE song_id = ?').run(songId)
     const ins = this.db.prepare(
-      `INSERT INTO song_track (song_id, track_index, name, instrument, mp3_path, source, volume)
-       VALUES (?,?,?,?,?,?,?)`
+      `INSERT INTO song_track (song_id, track_index, name, instrument, mp3_path, source, volume, muted, solo)
+       VALUES (?,?,?,?,?,?,?,?,?)`
     )
     for (const t of tracks)
-      ins.run(songId, t.trackIndex, t.name, t.instrument, t.mp3Path, t.source, t.volume)
+      ins.run(
+        songId,
+        t.trackIndex,
+        t.name,
+        t.instrument,
+        t.mp3Path,
+        t.source,
+        t.volume,
+        t.muted ? 1 : 0,
+        t.solo ? 1 : 0
+      )
   }
 
   private pruneEmpty(): void {
@@ -279,7 +306,7 @@ export class LibraryRepo {
     const tracks = (
       this.db
         .prepare(
-          'SELECT track_index, name, instrument, mp3_path, source, volume FROM song_track WHERE song_id = ? ORDER BY track_index'
+          'SELECT track_index, name, instrument, mp3_path, source, volume, muted, solo FROM song_track WHERE song_id = ? ORDER BY track_index'
         )
         .all(r.id) as TrackDbRow[]
     ).map((t) => ({
@@ -288,7 +315,9 @@ export class LibraryRepo {
       instrument: t.instrument,
       mp3Path: t.mp3_path,
       source: t.source,
-      volume: t.volume
+      volume: t.volume,
+      muted: t.muted === 1,
+      solo: t.solo === 1
     }))
     return {
       id: r.id,
@@ -305,6 +334,7 @@ export class LibraryRepo {
       midiPath: r.midi_path,
       masterMp3Path: r.master_mp3_path,
       masterSource: r.master_source,
+      synthSource: r.synth_source,
       syncOffsetMs: r.sync_offset_ms,
       durationMs: r.duration_ms,
       tracks

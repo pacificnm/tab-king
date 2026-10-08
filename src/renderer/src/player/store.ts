@@ -1,6 +1,17 @@
 import { create } from 'zustand'
-import type { Song } from '@shared/types'
+import type { Song, SynthSource } from '@shared/types'
 import type { Section } from './player-math'
+
+/** A track as shown in the track panel (TRK-1) with its persisted mix (TRK-2). */
+export interface PanelTrack {
+  index: number
+  name: string
+  instrument: string | null
+  /** 1 = 100%. */
+  volume: number
+  muted: boolean
+  solo: boolean
+}
 
 export type PlayerStatus = 'idle' | 'loading' | 'ready' | 'error'
 export type TabLayout = 'page' | 'horizontal'
@@ -23,6 +34,14 @@ export interface PlayerState {
   currentMeasure: number
   measureCount: number
   sections: Section[]
+
+  tracks: PanelTrack[]
+  /** Track shown/played alone in the practice view (TRK-5); null = full score and mix. */
+  practiceTrack: number | null
+  synthSource: SynthSource
+  /** The song has a usable attached MIDI file (TRK-6). */
+  hasMidi: boolean
+  midiError: string | null
 
   speed: number
   metronomeOn: boolean
@@ -49,6 +68,11 @@ export const initialPlayerState: PlayerState = {
   currentMeasure: 0,
   measureCount: 0,
   sections: [],
+  tracks: [],
+  practiceTrack: null,
+  synthSource: 'gp',
+  hasMidi: false,
+  midiError: null,
   speed: 1,
   metronomeOn: false,
   metronomeVolume: 0.6,

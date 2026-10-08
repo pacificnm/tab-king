@@ -102,7 +102,9 @@ export class SongService {
       instrument: t.instrument,
       mp3Path: slot(t.mp3, `track${t.trackIndex + 1}-`),
       source: t.mp3 ? t.source : 'synth',
-      volume: t.volume
+      volume: t.volume,
+      muted: t.muted,
+      solo: t.solo
     }))
 
     let coverPath: string | null | undefined
@@ -135,6 +137,7 @@ export class SongService {
       midiPath,
       masterMp3Path,
       masterSource: masterMp3Path ? form.masterSource : 'synth',
+      synthSource: midiPath ? form.synthSource : 'gp',
       syncOffsetMs: form.syncOffsetMs,
       durationMs: form.durationMs,
       tracks
