@@ -1,0 +1,14 @@
+[
+  { "id": "getting-started", "title": "Getting started", "file": "getting-started.md" },
+  { "id": "adding-songs", "title": "Adding songs", "file": "adding-songs.md" },
+  { "id": "browsing", "title": "Browsing and searching", "file": "browsing.md" },
+  { "id": "playlists", "title": "Play lists and favorites", "file": "playlists.md" },
+  { "id": "playing", "title": "Playing a tab", "file": "playing.md" },
+  { "id": "practice", "title": "Practice tools", "file": "practice.md" },
+  { "id": "tracks", "title": "Tracks and mixing", "file": "tracks.md" },
+  { "id": "mp3-sync", "title": "MP3 audio and sync", "file": "mp3-sync.md" },
+  { "id": "shortcuts", "title": "Keyboard shortcuts", "file": "shortcuts.md" },
+  { "id": "preferences", "title": "Preferences", "file": "preferences.md" },
+  { "id": "backup-restore", "title": "Backup and restore", "file": "backup-restore.md" },
+  { "id": "troubleshooting", "title": "Troubleshooting", "file": "troubleshooting.md" }
+]

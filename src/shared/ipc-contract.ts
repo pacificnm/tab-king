@@ -1,6 +1,14 @@
 import { z } from 'zod'
+import { THEMES } from './types'
 import type {
   AlbumRow,
+  BackupResult,
+  LibraryMoveResult,
+  LibraryPlan,
+  PreferencesView,
+  RestorePlan,
+  TaskProgress,
+  UpdateCheck,
   ArtistRow,
   FileCheck,
   Id3Info,
@@ -93,6 +101,23 @@ export const SongSyncSchema = z.object({
     .max(10_000)
 })
 
+/** Partial update of the preferences the renderer may change directly (locations and the SoundFont have their own calls). */
+export const PreferencesPatchSchema = z
+  .object({
+    theme: z.enum(THEMES),
+    audio: z
+      .object({
+        outputDeviceId: z.string().max(500).nullable(),
+        metronomeOn: z.boolean(),
+        countInOn: z.boolean()
+      })
+      .partial()
+      .strict()
+  })
+  .partial()
+  .strict()
+export type PreferencesPatch = z.infer<typeof PreferencesPatchSchema>
+
 /** API exposed to the renderer as `window.api`. */
 export interface TabKingApi {
   win: {
@@ -106,6 +131,34 @@ export interface TabKingApi {
     getInfo(): Promise<AppInfo>
     /** True only when launched by the e2e harness; enables `window.__tabking` timing probes. */
     readonly diagnostics: boolean
+    /** Progress of backup / restore / library moves. */
+    onProgress(cb: (p: TaskProgress) => void): () => void
+    /** User-initiated: asks GitHub Releases whether a newer version exists (ABT-2). */
+    checkForUpdates(): Promise<Result<UpdateCheck>>
+  }
+  prefs: {
+    get(): Promise<PreferencesView>
+    update(patch: PreferencesPatch): Promise<Result<PreferencesView>>
+    onChanged(cb: (view: PreferencesView) => void): () => void
+    /** Folder picker for the library; null if cancelled. Pass `useDefault` to skip the picker. */
+    chooseLibraryDir(useDefault?: boolean): Promise<Result<LibraryPlan | null>>
+    /** Switch to the planned folder, copying the current files into it when `migrate` is set. */
+    applyLibraryDir(token: string, migrate: boolean): Promise<Result<LibraryMoveResult>>
+    /** Delete the files that the last move copied out of the old folder. */
+    removeOldLibrary(): Promise<Result<number>>
+    /** Folder picker for backups; null if cancelled. */
+    chooseBackupDir(): Promise<Result<PreferencesView | null>>
+    resetBackupDir(): Promise<Result<PreferencesView>>
+    chooseSoundFont(): Promise<Result<PreferencesView | null>>
+    resetSoundFont(): Promise<PreferencesView>
+  }
+  backup: {
+    /** Writes a .zip of the database and library into the backup folder. */
+    create(): Promise<Result<BackupResult>>
+    /** File picker + validation; null if cancelled. */
+    choose(): Promise<Result<RestorePlan | null>>
+    /** Replaces the library with the archive's and restarts the app. */
+    restore(token: string): Promise<Result<null>>
   }
   library: {
     listArtists(): Promise<ArtistRow[]>

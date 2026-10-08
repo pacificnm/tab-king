@@ -36,6 +36,11 @@ describe('parseMediaUrl', () => {
       rel: 'soundfont/sonivox.sf3'
     })
     expect(parseMediaUrl('tabking://library/a/b.gp')).toEqual({ host: 'library', rel: 'a/b.gp' })
+    expect(parseMediaUrl('tabking://soundfonts/My%20Bank.sf2')).toEqual({
+      host: 'soundfonts',
+      rel: 'My Bank.sf2'
+    })
+    expect(parseMediaUrl('tabking://soundfonts/..%2Fx.sf2')).toBeNull()
     expect(parseMediaUrl('tabking://evil/a')).toBeNull()
   })
 })

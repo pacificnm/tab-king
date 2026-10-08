@@ -16,7 +16,35 @@ const api: TabKingApi = {
   },
   app: {
     getInfo: () => ipcRenderer.invoke(IPC.appGetInfo),
-    diagnostics: process.argv.includes('--tabking-e2e')
+    diagnostics: process.argv.includes('--tabking-e2e'),
+    onProgress: (cb) => {
+      const listener = (_e: unknown, p: Parameters<typeof cb>[0]): void => cb(p)
+      ipcRenderer.on(IPC.taskProgress, listener)
+      return () => ipcRenderer.removeListener(IPC.taskProgress, listener)
+    },
+    checkForUpdates: () => ipcRenderer.invoke(IPC.updateCheck)
+  },
+  prefs: {
+    get: () => ipcRenderer.invoke(IPC.prefsGet),
+    update: (patch) => ipcRenderer.invoke(IPC.prefsUpdate, patch),
+    onChanged: (cb) => {
+      const listener = (_e: unknown, view: Parameters<typeof cb>[0]): void => cb(view)
+      ipcRenderer.on(IPC.prefsChanged, listener)
+      return () => ipcRenderer.removeListener(IPC.prefsChanged, listener)
+    },
+    chooseLibraryDir: (useDefault) => ipcRenderer.invoke(IPC.prefsChooseLibraryDir, useDefault),
+    applyLibraryDir: (token, migrate) =>
+      ipcRenderer.invoke(IPC.prefsApplyLibraryDir, token, migrate),
+    removeOldLibrary: () => ipcRenderer.invoke(IPC.prefsRemoveOldLibrary),
+    chooseBackupDir: () => ipcRenderer.invoke(IPC.prefsChooseBackupDir),
+    resetBackupDir: () => ipcRenderer.invoke(IPC.prefsResetBackupDir),
+    chooseSoundFont: () => ipcRenderer.invoke(IPC.prefsChooseSoundFont),
+    resetSoundFont: () => ipcRenderer.invoke(IPC.prefsResetSoundFont)
+  },
+  backup: {
+    create: () => ipcRenderer.invoke(IPC.backupCreate),
+    choose: () => ipcRenderer.invoke(IPC.backupChoose),
+    restore: (token) => ipcRenderer.invoke(IPC.backupRestore, token)
   },
   library: {
     listArtists: () => ipcRenderer.invoke(IPC.libListArtists),

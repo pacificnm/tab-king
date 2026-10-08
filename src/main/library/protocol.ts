@@ -18,7 +18,9 @@ const MIME: Record<string, string> = {
   '.woff2': 'font/woff2',
   '.woff': 'font/woff',
   '.sf3': 'application/octet-stream',
-  '.sf2': 'application/octet-stream'
+  '.sf2': 'application/octet-stream',
+  '.md': 'text/markdown; charset=utf-8',
+  '.json': 'application/json'
 }
 
 /** Must run before `app.ready`. */
@@ -37,9 +39,12 @@ export function registerScheme(): void {
   ])
 }
 
-export type MediaHost = 'library' | 'app'
+export type MediaHost = 'library' | 'app' | 'soundfonts'
 
-/** Parse `tabking://library/<relpath>` (user files) or `tabking://app/<relpath>` (bundled assets); null if invalid. */
+/**
+ * Parse `tabking://library/<relpath>` (user files), `tabking://app/<relpath>` (bundled assets) or
+ * `tabking://soundfonts/<name>` (the user's SoundFonts); null if invalid.
+ */
 export function parseMediaUrl(url: string): { host: MediaHost; rel: string } | null {
   let u: URL
   try {
@@ -47,18 +52,19 @@ export function parseMediaUrl(url: string): { host: MediaHost; rel: string } | n
   } catch {
     return null
   }
-  if (u.protocol !== `${SCHEME}:` || (u.hostname !== 'library' && u.hostname !== 'app')) return null
+  if (u.protocol !== `${SCHEME}:` || !['library', 'app', 'soundfonts'].includes(u.hostname))
+    return null
   try {
     const segs = u.pathname.split('/').slice(1).map(decodeURIComponent)
     if (segs.some((s) => s === '' || s === '.' || s === '..' || /[\\/\0]/.test(s))) return null
-    return { host: u.hostname, rel: segs.join('/') }
+    return { host: u.hostname as MediaHost, rel: segs.join('/') }
   } catch {
     return null
   }
 }
 
 /** Only these bundled-resource folders may be read through the `app` host. */
-const APP_ALLOWED_PREFIXES = ['soundfont/', 'font/']
+const APP_ALLOWED_PREFIXES = ['soundfont/', 'font/', 'help/']
 
 /** Parse a single `bytes=a-b` Range header against a file size. Null = unsatisfiable/invalid. */
 export function parseRange(header: string, size: number): { start: number; end: number } | null {
@@ -78,7 +84,11 @@ export function parseRange(header: string, size: number): { start: number; end: 
   return { start, end }
 }
 
-export function registerLibraryProtocol(store: LibraryStore, resourcesDir: string): void {
+export function registerLibraryProtocol(
+  store: LibraryStore,
+  resourcesDir: string,
+  soundfontsDir: string
+): void {
   protocol.handle(SCHEME, (request) => {
     const parsed = parseMediaUrl(request.url)
     if (!parsed) return new Response('Bad request', { status: 400 })
@@ -89,7 +99,11 @@ export function registerLibraryProtocol(store: LibraryStore, resourcesDir: strin
     let size: number
     try {
       abs =
-        parsed.host === 'app' ? resolveWithin(resourcesDir, parsed.rel) : store.resolve(parsed.rel)
+        parsed.host === 'app'
+          ? resolveWithin(resourcesDir, parsed.rel)
+          : parsed.host === 'soundfonts'
+            ? resolveWithin(soundfontsDir, parsed.rel)
+            : store.resolve(parsed.rel)
       const st = statSync(abs)
       if (!st.isFile()) return new Response('Not found', { status: 404 })
       size = st.size

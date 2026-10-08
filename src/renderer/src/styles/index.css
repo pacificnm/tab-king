@@ -2,7 +2,7 @@
 
 /* Theme tokens: components use these via Tailwind utilities (bg-surface, text-fg, ...). */
 :root,
-:root[data-theme='dark'] {
+[data-theme='dark'] {
   --c-bg: #0f1115;
   --c-surface: #171a21;
   --c-surface-2: #1f2430;
@@ -15,16 +15,44 @@
   color-scheme: dark;
 }
 
-:root[data-theme='light'] {
+[data-theme='light'] {
   --c-bg: #f5f6f8;
   --c-surface: #ffffff;
   --c-surface-2: #eceef3;
   --c-border: #d5d9e2;
   --c-fg: #1a1d24;
   --c-fg-muted: #565e70;
-  --c-accent: #b86e00;
+  --c-accent: #9a5900;
   --c-accent-fg: #ffffff;
   --c-danger: #c62828;
+  color-scheme: light;
+}
+
+/* Blue-tinted dark theme. */
+[data-theme='midnight'] {
+  --c-bg: #0b1220;
+  --c-surface: #111a2e;
+  --c-surface-2: #1a2540;
+  --c-border: #2c3d63;
+  --c-fg: #e4ebf8;
+  --c-fg-muted: #a3b3d2;
+  --c-accent: #5cb3ff;
+  --c-accent-fg: #06121f;
+  --c-danger: #ff7b7b;
+  color-scheme: dark;
+}
+
+/* Warm, paper-like light theme. */
+[data-theme='amber'] {
+  --c-bg: #f7efdc;
+  --c-surface: #fffaf0;
+  --c-surface-2: #f0e3c4;
+  --c-border: #d4c18f;
+  --c-fg: #2b2112;
+  --c-fg-muted: #66573a;
+  --c-accent: #8f4b00;
+  --c-accent-fg: #ffffff;
+  --c-danger: #b3261e;
   color-scheme: light;
 }
 

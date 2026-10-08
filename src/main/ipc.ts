@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, type IpcMainInvokeEvent } from 'electron'
 import { AppInfoSchema, IPC } from '@shared/ipc-contract'
+import { appVersion } from './app-version'
 
 /** Resolve the window that sent the message; reject senders that aren't one of our windows. */
 function senderWindow(e: IpcMainInvokeEvent): BrowserWindow {
@@ -22,7 +23,7 @@ export function registerIpc(): void {
     const platform = process.platform
     return AppInfoSchema.parse({
       name: app.getName(),
-      version: app.getVersion(),
+      version: appVersion(),
       platform: platform === 'win32' || platform === 'darwin' ? platform : 'linux'
     })
   })

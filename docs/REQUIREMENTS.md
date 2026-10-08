@@ -119,6 +119,6 @@ Folder scanning/watching, cloud sync, multi-user, tab editing/authoring, online 
 
 ## 11. Open questions
 
-1. ~~Which SoundFont to bundle?~~ **Resolved (M2):** the Sonivox EAS GM bank (`sonivox.sf3`, ~1 MB) distributed with alphaTab, licensed Apache-2.0 by Sonic Network Inc.; recorded in `NOTICE`. PRF-3 (soundfont selection) can add user-chosen SoundFonts later.
+1. ~~Which SoundFont to bundle?~~ **Resolved (M2):** the Sonivox EAS GM bank (`sonivox.sf3`, ~1 MB) distributed with alphaTab, licensed Apache-2.0 by Sonic Network Inc.; recorded in `NOTICE`. PRF-3 (**M6**) adds user-chosen SoundFonts.
 2. ~~Should Previous/Next move by measure, section, or song?~~ **Resolved (M2):** by measure. Previous restarts the current measure unless playback is within half a beat of its start, then goes to the previous measure. Songs/sections are reached via the tree and the section picker; queue-level song skip arrives with PLY-8 (M5).
 3. Is app-level undo needed for library edits? Assumed no.

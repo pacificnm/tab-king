@@ -11,8 +11,11 @@ import { writeGp, writeMidi, writeTaggedMp3 } from './fixtures'
 
 export const makeTmp = (): string => mkdtempSync(join(tmpdir(), 'tabking-e2e-'))
 
-export async function launchApp(tmp: string): Promise<{ app: ElectronApplication; page: Page }> {
-  const env = { ...process.env } as Record<string, string>
+export async function launchApp(
+  tmp: string,
+  extraEnv: Record<string, string> = {}
+): Promise<{ app: ElectronApplication; page: Page }> {
+  const env = { ...process.env, ...extraEnv } as Record<string, string>
   delete env.ELECTRON_RUN_AS_NODE
   env.TABKING_E2E = '1'
   const userData = `--user-data-dir=${join(tmp, 'ud')}`

@@ -1,6 +1,7 @@
 import SignalsmithStretch, { type StretchNode } from 'signalsmith-stretch'
 import stretchModuleUrl from 'signalsmith-stretch?url'
 import type { Mp3SourceId } from './mix-plan'
+import { routeToOutputDevice } from './audio-output'
 import { computePeaks, PEAKS_PER_SECOND } from './peaks'
 
 /**
@@ -51,6 +52,7 @@ export class Mp3Engine {
 
   constructor(private readonly memoryBudget = DEFAULT_MEMORY_BUDGET_BYTES) {
     this.ctx = new AudioContext({ latencyHint: 'interactive' })
+    routeToOutputDevice(this.ctx)
     this.out = this.ctx.createGain()
     this.out.connect(this.ctx.destination)
     if (!moduleConfigured) {

@@ -34,5 +34,20 @@ export const IPC = {
   libPlaylistAdd: 'lib:playlist-add',
   libPlaylistRemove: 'lib:playlist-remove',
   libPlaylistReorder: 'lib:playlist-reorder',
-  libChanged: 'lib:changed'
+  libChanged: 'lib:changed',
+  prefsGet: 'prefs:get',
+  prefsUpdate: 'prefs:update',
+  prefsChanged: 'prefs:changed',
+  prefsChooseLibraryDir: 'prefs:choose-library-dir',
+  prefsApplyLibraryDir: 'prefs:apply-library-dir',
+  prefsRemoveOldLibrary: 'prefs:remove-old-library',
+  prefsChooseBackupDir: 'prefs:choose-backup-dir',
+  prefsResetBackupDir: 'prefs:reset-backup-dir',
+  prefsChooseSoundFont: 'prefs:choose-soundfont',
+  prefsResetSoundFont: 'prefs:reset-soundfont',
+  backupCreate: 'backup:create',
+  backupChoose: 'backup:choose',
+  backupRestore: 'backup:restore',
+  taskProgress: 'task:progress',
+  updateCheck: 'update:check'
 } as const

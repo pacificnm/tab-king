@@ -1,3 +1,5 @@
+import { routeToOutputDevice } from './audio-output'
+
 /**
  * Audible count-in before playback starts (PLY-4): `clicks` clicks at the song tempo, the first accented.
  * Independent of the audio source so it also works for MP3 playback later.
@@ -15,7 +17,11 @@ export class CountIn {
   start(bpm: number, clicks: number, volume: number, onDone: () => void): void {
     this.cancel()
     const intervalS = 60 / Math.max(20, bpm)
-    const ctx = (this.ctx ??= new AudioContext())
+    if (!this.ctx) {
+      this.ctx = new AudioContext()
+      routeToOutputDevice(this.ctx)
+    }
+    const ctx = this.ctx
     void ctx.resume()
     const t0 = ctx.currentTime + 0.05
     for (let i = 0; i < clicks; i++) {

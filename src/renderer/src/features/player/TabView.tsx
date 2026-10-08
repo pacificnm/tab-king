@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { libraryUrl } from '@shared/types'
 import { btn, input } from '../../components/Modal'
 import { installDiagnostics, player, usePlayerStore } from '../../player'
+import { currentSoundFontUrl } from '../../prefs/store'
 import { PAD_MS } from '../../player/mp3-engine'
 import { PlayerEngine } from '../../player/player-engine'
 import { parseSmf, type ParsedSmf } from '../../player/smf'
@@ -9,7 +10,6 @@ import { SyncEditor } from './SyncEditor'
 import { TrackPanel } from './TrackPanel'
 
 const FONT_DIRECTORY = 'tabking://app/font/'
-const SOUNDFONT_URL = 'tabking://app/soundfont/sonivox.sf3'
 
 function RangeControls(): React.JSX.Element {
   const measureCount = usePlayerStore((s) => s.measureCount)
@@ -157,7 +157,12 @@ export default function TabView(): React.JSX.Element {
 
   useEffect(() => {
     if (!container.current || !scroller.current) return
-    const e = new PlayerEngine(container.current, scroller.current, FONT_DIRECTORY, SOUNDFONT_URL)
+    const e = new PlayerEngine(
+      container.current,
+      scroller.current,
+      FONT_DIRECTORY,
+      currentSoundFontUrl()
+    )
     engine.current = e
     player.attach(e)
     if (window.api.app.diagnostics) installDiagnostics(PAD_MS)
