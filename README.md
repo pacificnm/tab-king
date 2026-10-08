@@ -26,17 +26,30 @@ Linux (x64, ARM64), Windows, macOS.
 
 ## Documentation
 
-| Doc | Purpose |
-| --- | --- |
-| [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md) | What the app must do (numbered, testable) |
-| [docs/SPECS.md](docs/SPECS.md) | How it is built: architecture, data model, UI, sync design |
-| [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md) | Phased plan, branch/merge/tag workflow |
-| [CLAUDE.md](CLAUDE.md) | Guidance for Claude Code working in this repo |
-| [PROMPT.md](PROMPT.md) | Original project brief |
+| Doc                                          | Purpose                                                    |
+| -------------------------------------------- | ---------------------------------------------------------- |
+| [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md) | What the app must do (numbered, testable)                  |
+| [docs/SPECS.md](docs/SPECS.md)               | How it is built: architecture, data model, UI, sync design |
+| [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md) | Phased plan, branch/merge/tag workflow                     |
+| [CLAUDE.md](CLAUDE.md)                       | Guidance for Claude Code working in this repo              |
+| [PROMPT.md](PROMPT.md)                       | Original project brief                                     |
 
 ## Development
 
-Not yet scaffolded. Planned commands: `npm install`, `npm run dev`, `npm test`, `npm run build`, `npm run dist`.
+Requires Node 22 (see `.nvmrc`).
+
+```bash
+npm install
+npm run dev          # run with hot reload
+npm test             # unit tests (Vitest)
+npm run lint && npm run typecheck
+npm run dist:dir     # unpacked package for the host platform
+npm run dist         # installers for the host platform
+```
+
+If you launch from an Electron-hosted terminal (e.g. VS Code), `unset ELECTRON_RUN_AS_NODE` first.
+
+Releases: bump `version` in `package.json`, add a `CHANGELOG.md` section, then push a matching `vX.Y.Z` tag. The release workflow builds Linux (x64, arm64), Windows (x64) and macOS (x64, arm64) and publishes a GitHub Release.
 
 ## License
 

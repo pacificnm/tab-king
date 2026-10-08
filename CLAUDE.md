@@ -18,6 +18,7 @@ Tab King: Electron desktop guitar-tab player (Songsterr-like). Single user, offl
 ## Architecture rules
 
 - Renderer has no Node access: `contextIsolation: true`, `nodeIntegration: false`. All OS/DB/file access goes through a typed preload IPC API (`window.api`). Validate every IPC payload in main.
+- The sandboxed preload cannot `require` npm packages: it may import only `electron` and plain-constant modules (`src/shared/ipc-channels.ts`), never zod or anything that pulls it in.
 - Schema changes only via numbered migrations in `src/main/db/migrations/`. Never edit a shipped migration.
 - Audio/playback logic lives in `src/renderer/player/`; UI components must not talk to alphaTab directly.
 - Keep modules small; shared types in `src/shared/`.
@@ -30,7 +31,9 @@ Tab King: Electron desktop guitar-tab player (Songsterr-like). Single user, offl
 - Commits: conventional commits (`feat:`, `fix:`, `docs:`...).
 - Don't add dependencies without checking their license is Apache-2.0-compatible.
 
-## Commands (once scaffolded)
+## Commands
+
+If running from a VS Code/Electron-hosted terminal, `unset ELECTRON_RUN_AS_NODE` first or Electron starts as plain Node and fails with `Cannot read properties of undefined (reading 'isPackaged')`.
 
 `npm run dev` · `npm test` · `npm run lint` · `npm run typecheck` · `npm run build` · `npm run dist`
 
