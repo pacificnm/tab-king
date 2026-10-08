@@ -1,3 +1,6 @@
+/** Resolution of the stored waveform envelope: one peak per 10 ms. */
+export const PEAKS_PER_SECOND = 100
+
 /** Max-abs envelope over `buckets` equal slices of `data` (0–1 for normalised audio). */
 export function computePeaks(data: Float32Array, buckets: number): Float32Array {
   const out = new Float32Array(buckets)

@@ -131,6 +131,14 @@ export class Mp3Playback {
     this.api.score?.applyFlatSyncPoints([])
   }
 
+  /** Move the audio to a media position and tell alphaTab where it is, so the cursor follows even when paused. */
+  seekMedia(mediaMs: number): void {
+    const engine = this.engine
+    if (!engine) return
+    engine.seekTo(mediaMs)
+    this.output()?.updatePosition(mediaMs)
+  }
+
   /** Drop every loaded source (a different song is opening). */
   unloadAll(): void {
     this.stopTicker()

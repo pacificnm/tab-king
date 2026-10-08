@@ -5,6 +5,7 @@ import { installDiagnostics, player, usePlayerStore } from '../../player'
 import { PAD_MS } from '../../player/mp3-engine'
 import { PlayerEngine } from '../../player/player-engine'
 import { parseSmf, type ParsedSmf } from '../../player/smf'
+import { SyncEditor } from './SyncEditor'
 import { TrackPanel } from './TrackPanel'
 
 const FONT_DIRECTORY = 'tabking://app/font/'
@@ -90,6 +91,21 @@ function RangeControls(): React.JSX.Element {
         </button>
       )}
     </div>
+  )
+}
+
+function SyncButton(): React.JSX.Element | null {
+  const hasAudio = usePlayerStore((s) => s.hasMaster || s.tracks.some((t) => t.hasMp3))
+  const ready = usePlayerStore((s) => s.status === 'ready')
+  const [open, setOpen] = useState(false)
+  if (!hasAudio) return null
+  return (
+    <>
+      <button type="button" className={btn} disabled={!ready} onClick={() => setOpen(true)}>
+        Sync audio…
+      </button>
+      {open && <SyncEditor onClose={() => setOpen(false)} />}
+    </>
   )
 }
 
@@ -219,6 +235,7 @@ export default function TabView(): React.JSX.Element {
         </div>
         <RangeControls />
         <ViewControls />
+        <SyncButton />
       </div>
       {error && (
         <p role="alert" className="border-b border-danger px-4 py-2 text-sm text-danger">

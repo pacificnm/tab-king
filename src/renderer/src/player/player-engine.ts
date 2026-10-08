@@ -34,6 +34,8 @@ export const COUNT_IN_CLICKS = 3
 /** Position updates reach the store at most this often (alphaTab reports every animation frame in MP3 mode). */
 const POSITION_THROTTLE_MS = 80
 const READY_TIMEOUT_MS = 15_000
+/** After a re-render finishes, how long to wait for playerReady before carrying on. */
+const RENDER_GRACE_MS = 600
 
 export interface LoadOptions {
   /** Saved mix for the song's tracks, by track index. */
@@ -326,7 +328,7 @@ export class PlayerEngine {
       if (resume) this.api.pause()
       set({ practiceTrack: index })
       // Re-rendering resets the playback position; put the player back where it was afterwards.
-      await this.waitForReady(() => this.api.renderTracks(track ? [track] : score.tracks))
+      await this.waitForReady(() => this.api.renderTracks(track ? [track] : score.tracks), true)
       this.api.tickPosition = tick
       await this.applyPlan()
       this.api.tickPosition = tick
@@ -358,6 +360,23 @@ export class PlayerEngine {
   setSync(offsetMs: number, points: readonly SyncPointRow[]): void {
     set({ syncOffsetMs: offsetMs, syncPoints: [...points] })
     if (this.mode === 'mp3') this.refreshSyncMap()
+  }
+
+  /** Move the cursor to the start of a (1-based) measure. */
+  seekToMeasure(measure: number): void {
+    const span = this.spans[measure - 1]
+    if (this.ready && span) this.api.tickPosition = span.start
+  }
+
+  /** Where the audio is in the MP3 file, in ms (pad excluded); null unless MP3 audio is the clock. */
+  playheadFileMs(): number | null {
+    const engine = this.mp3.mp3
+    return engine && this.mode === 'mp3' ? engine.positionMs() - PAD_MS : null
+  }
+
+  /** Move the audio to a position in the MP3 file (sync editor); the cursor follows through the sync map. */
+  seekFileMs(fileMs: number): void {
+    if (this.mode === 'mp3') this.mp3.seekMedia(Math.max(0, fileMs) + PAD_MS)
   }
 
   /** Bar start times for drawing the sync editor; null until a score is ready. */
@@ -609,15 +628,25 @@ export class PlayerEngine {
     }
   }
 
-  /** Resolves on the next `playerReady` (after the trigger), or after a timeout so nothing can hang. */
-  private waitForReady(trigger: () => void): Promise<void> {
+  /**
+   * Resolves on the next `playerReady` (after the trigger). With `orAfterRender` it also resolves shortly after the
+   * next render finishes: re-rendering tracks regenerates the MIDI (and fires playerReady) with the synth, but not
+   * in external-media mode. A timeout means nothing can hang the operation queue.
+   */
+  private waitForReady(trigger: () => void, orAfterRender = false): Promise<void> {
     return new Promise<void>((resolve) => {
-      const timer = setTimeout(done, READY_TIMEOUT_MS)
-      function done(): void {
+      let finished = false
+      const done = (): void => {
+        if (finished) return
+        finished = true
         clearTimeout(timer)
+        this.api.postRenderFinished.off(onRender)
         resolve()
       }
+      const onRender = (): void => void setTimeout(done, RENDER_GRACE_MS)
+      const timer = setTimeout(done, READY_TIMEOUT_MS)
       this.readyWaiters.push(done)
+      if (orAfterRender) this.api.postRenderFinished.on(onRender)
       trigger()
     })
   }

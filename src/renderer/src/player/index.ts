@@ -68,6 +68,10 @@ export const player = {
   /** Apply a start offset / sync points immediately (sync editor preview). Does not save. */
   setSync: (offsetMs: number, points: readonly SyncPointRow[]) => engine?.setSync(offsetMs, points),
   syncContext: () => engine?.syncContext() ?? null,
+  seekToMeasure: (measure: number) => engine?.seekToMeasure(measure),
+  /** Audio position in the MP3 file in ms, or null when MP3 audio isn't playing. */
+  playheadFileMs: () => engine?.playheadFileMs() ?? null,
+  seekFileMs: (fileMs: number) => engine?.seekFileMs(fileMs),
   /** The MP3 engine (null until MP3 audio has been used); for the sync editor's waveform and playhead. */
   mp3Engine: () => engine?.mp3Engine ?? null,
   ensureMp3Source: (id: 'master' | `track:${number}`) =>

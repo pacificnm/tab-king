@@ -1,7 +1,7 @@
 import SignalsmithStretch, { type StretchNode } from 'signalsmith-stretch'
 import stretchModuleUrl from 'signalsmith-stretch?url'
 import type { Mp3SourceId } from './mix-plan'
-import { computePeaks } from './peaks'
+import { computePeaks, PEAKS_PER_SECOND } from './peaks'
 
 /**
  * Silence prepended to every source. The MP3 timeline therefore runs from -PAD_MS, which lets a negative start offset
@@ -23,7 +23,7 @@ interface Loaded {
   lastUsed: number
   /** Linear gain currently requested for this source. */
   level: number
-  /** Down-sampled peak envelope (0–1) of the audio after the pad, for the sync editor's waveform. */
+  /** Peak envelope (0–1), {@link PEAKS_PER_SECOND} per second, of the audio after the pad, for the sync editor. */
   peaks: Float32Array
 }
 
@@ -125,7 +125,10 @@ export class Mp3Engine {
       data.set(src, pad)
       channels.push(data)
     }
-    const peaks = computePeaks(audio.getChannelData(0), 2000)
+    const peaks = computePeaks(
+      audio.getChannelData(0),
+      Math.max(1, Math.ceil(audio.duration * PEAKS_PER_SECOND))
+    )
     const node = await SignalsmithStretch(this.ctx)
     const gain = this.ctx.createGain()
     gain.gain.value = 0
