@@ -18,13 +18,32 @@ test('the app starts, is usable within the startup budget, and reports its versi
     console.log(`startup to interactive: ${startupMs} ms (budget ${BUDGET_MS} ms)`)
     expect(startupMs).toBeLessThan(BUDGET_MS)
 
+    // Each step is bounded and logged, so a hang on one platform names the call that hung.
+    const step = async <T>(name: string, run: () => Promise<T>): Promise<T> => {
+      console.log(`step: ${name}`)
+      return await Promise.race([
+        run(),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error(`step "${name}" did not finish in 15 s`)), 15_000)
+        )
+      ])
+    }
     const version = (JSON.parse(readFileSync('package.json', 'utf8')) as { version: string })
       .version
-    expect((await page.evaluate(() => window.api.app.getInfo())).version).toBe(version)
+    const info = await step('app.getInfo', () => page.evaluate(() => window.api.app.getInfo()))
+    expect(info.version).toBe(version)
     // the database opened and migrated, and the window is not showing an error
-    expect(await page.evaluate(() => window.api.library.listArtists())).toEqual([])
-    await expect(page.getByRole('menubar')).toBeVisible()
+    const artists = await step('library.listArtists', () =>
+      page.evaluate(() => window.api.library.listArtists())
+    )
+    expect(artists).toEqual([])
+    await step('menubar', () =>
+      expect(page.getByRole('menubar'))
+        .toBeVisible()
+        .then(() => null)
+    )
   } finally {
+    console.log('step: close')
     await app.close().catch(() => undefined)
     rmSync(tmp, { recursive: true, force: true })
   }
