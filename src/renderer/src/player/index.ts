@@ -1,11 +1,13 @@
 import type { AudioSource, Song, SyncPointRow, SynthSource } from '@shared/types'
 import { flushMix } from './mix-persistence'
+import { makeQueue, seekQueue, type Queue } from './queue'
 import type { PlayerEngine } from './player-engine'
 import { clampSpeed, stepSpeed } from './player-math'
 import { usePlayerStore, type TabLayout } from './store'
 
 export { usePlayerStore } from './store'
 export type { PlayerState, TabLayout } from './store'
+export type { Queue }
 export { formatTime } from './player-math'
 
 let engine: PlayerEngine | null = null
@@ -29,6 +31,25 @@ export const player = {
     flushMix() // save the previous song's track mix before it is replaced
     set((s) => ({ song, openToken: s.openToken + 1, autoplay, status: 'loading', error: null }))
   },
+  /** Set what plays after this song; pass the songs of an album/playlist/search and where in them we are. */
+  setQueue(songs: readonly Song[], index: number, label: string): void {
+    set({ queue: makeQueue(songs, index, label) })
+  },
+  /** Move the queue's position (after the user or auto-advance picked another song in it). */
+  setQueueIndex(index: number): void {
+    set((s) => (s.queue ? { queue: { ...s.queue, index } } : {}))
+  },
+  /** If `songId` is in the current queue, point the queue at it; otherwise leave the queue alone. */
+  followQueue(songId: number): boolean {
+    const q = get().queue
+    const next = q && seekQueue(q, songId)
+    if (next) set({ queue: next })
+    return !!next
+  },
+  clearQueue(): void {
+    set({ queue: null })
+  },
+
   /** Report a load failure (e.g. missing file) so the tab view shows it instead of crashing. */
   fail(message: string): void {
     set({ status: 'error', error: message, playing: false, countingIn: false })

@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { AudioSource, Song, SyncPointRow, SynthSource } from '@shared/types'
 import type { Section } from './player-math'
+import type { Queue } from './queue'
 
 /** A track as shown in the track panel (TRK-1) with its persisted mix (TRK-2). */
 export interface PanelTrack {
@@ -26,6 +27,10 @@ export type TabLayout = 'page' | 'horizontal'
 export interface PlayerState {
   /** Song most recently opened in the player. */
   song: Song | null
+  /** What plays after the current song (album, playlist, search results...). */
+  queue: Queue | null
+  /** Bumped each time a song plays through to its natural end (not on Stop, not while looping). */
+  songEnded: number
   /** Bumped on every open so re-opening the same song reloads it. */
   openToken: number
   /** Start playing as soon as the song is ready. */
@@ -77,6 +82,8 @@ export interface PlayerState {
 
 export const initialPlayerState: PlayerState = {
   song: null,
+  queue: null,
+  songEnded: 0,
   openToken: 0,
   autoplay: false,
   status: 'idle',

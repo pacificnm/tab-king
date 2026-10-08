@@ -14,7 +14,7 @@ interface FormProps {
   danger?: boolean
 }
 
-function DialogForm({
+export function DialogForm({
   title,
   submitLabel,
   busy,
@@ -55,7 +55,7 @@ function DialogForm({
 }
 
 /** Run a Result-returning call, mapping failures to an inline message. */
-function useAction(
+export function useAction(
   run: () => Promise<{ ok: true } | { ok: false; error: string }>,
   done: () => void
 ) {

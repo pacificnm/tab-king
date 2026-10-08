@@ -9,22 +9,26 @@ export const PNG = Buffer.from(
 )
 
 const BARS = 8
-const TEX =
+const tex = (bars: number): string =>
   '\\title "GP Title" \\artist "GP Artist" \\album "GP Album" \\tempo 120 \\track "Lead" ' +
-  Array.from({ length: BARS }, () => '3.3.4*4').join(' | ') +
+  Array.from({ length: bars }, () => '3.3.4*4').join(' | ') +
   ' \\track "Bass" ' +
-  Array.from({ length: BARS }, () => '1.3.4*4').join(' | ')
+  Array.from({ length: bars }, () => '1.3.4*4').join(' | ')
 
-function score(settings: Settings): ReturnType<importer.AlphaTexImporter['readScore']> {
+function score(
+  settings: Settings,
+  bars = BARS
+): ReturnType<importer.AlphaTexImporter['readScore']> {
   const imp = new importer.AlphaTexImporter()
-  imp.initFromString(TEX, settings)
+  imp.initFromString(tex(bars), settings)
   return imp.readScore()
 }
 
-export function writeGp(dir: string, name: string): string {
+/** A Guitar Pro file of `bars` bars of 4/4 at 120 bpm (2 s per bar). */
+export function writeGp(dir: string, name: string, bars = BARS): string {
   const settings = new Settings()
   const file = join(dir, name)
-  writeFileSync(file, new exporter.Gp7Exporter().export(score(settings), settings))
+  writeFileSync(file, new exporter.Gp7Exporter().export(score(settings, bars), settings))
   return file
 }
 

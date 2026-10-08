@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react'
 import { List, useListRef, type RowComponentProps } from 'react-window'
-import type { Song } from '@shared/types'
+import type { PlaylistRow, Song } from '@shared/types'
 import { Cover } from '../../components/Cover'
 import type { MenuTarget } from './actions'
 import type { NavId, TreeRow } from './tree-model'
@@ -13,7 +13,10 @@ interface Props {
   activeSongId: number | null
   onNav: (id: NavId) => void
   onOpenSong: (song: Song) => void
+  onOpenPlaylist: (playlist: PlaylistRow) => void
+  /** Double-click / Enter on a song: play it with its album as the queue. */
   onPlaySong: (song: Song) => void
+  onToggleFavorite: (song: Song) => void
   onMenu: (target: MenuTarget, x: number, y: number) => void
 }
 
@@ -24,6 +27,7 @@ interface RowProps {
   activeSongId: number | null
   activate: (row: TreeRow) => void
   playSong: (song: Song) => void
+  toggleFavorite: (song: Song) => void
   menu: (row: TreeRow, x: number, y: number) => void
   onFocusRow: (index: number) => void
 }
@@ -51,6 +55,7 @@ function Row({
   activeSongId,
   activate,
   playSong,
+  toggleFavorite,
   menu,
   onFocusRow
 }: RowComponentProps<RowProps>): React.JSX.Element | null {
@@ -59,8 +64,7 @@ function Row({
   const selected =
     (row.kind === 'nav' && row.id === activeNav) ||
     (row.kind === 'song' && row.song.id === activeSongId)
-  const expandable =
-    (row.kind === 'nav' && row.expandable) || row.kind === 'artist' || row.kind === 'album'
+  const expandable = isExpandable(row)
   const expanded = 'expanded' in row ? row.expanded : false
 
   const common = {
@@ -84,7 +88,9 @@ function Row({
         ? row.artist.name
         : row.kind === 'album'
           ? row.album.title
-          : row.song.title
+          : row.kind === 'playlist'
+            ? row.playlist.name
+            : row.song.title
 
   return (
     <div
@@ -115,14 +121,43 @@ function Row({
       {row.kind === 'album' && (
         <span className="ml-auto text-xs text-fg-muted">{row.album.songCount}</span>
       )}
+      {row.kind === 'playlist' && (
+        <span className="ml-auto text-xs text-fg-muted">{row.playlist.songCount}</span>
+      )}
+      {row.kind === 'song' && (
+        <button
+          type="button"
+          tabIndex={-1}
+          aria-label={`${row.song.favorite ? 'Remove from favorites' : 'Add to favorites'}: ${row.song.title}`}
+          aria-pressed={row.song.favorite}
+          title={row.song.favorite ? 'Remove from favorites' : 'Add to favorites'}
+          className={`ml-auto shrink-0 px-1 text-base leading-none hover:text-accent ${row.song.favorite ? 'text-accent' : 'text-fg-muted'}`}
+          onClick={(e) => {
+            e.stopPropagation()
+            toggleFavorite(row.song)
+          }}
+          onDoubleClick={(e) => e.stopPropagation()}
+        >
+          {row.song.favorite ? '♥' : '♡'}
+        </button>
+      )}
     </div>
   )
 }
 
+const isExpandable = (row: TreeRow): boolean =>
+  (row.kind === 'nav' && row.expandable) || row.kind === 'artist' || row.kind === 'album'
+
 function targetOf(row: TreeRow): MenuTarget | null {
   switch (row.kind) {
     case 'nav':
-      return row.id === 'artists' ? { kind: 'artists-root' } : null
+      return row.id === 'artists'
+        ? { kind: 'artists-root' }
+        : row.id === 'playlists'
+          ? { kind: 'playlists-root' }
+          : null
+    case 'playlist':
+      return { kind: 'playlist', playlist: row.playlist }
     case 'artist':
       return { kind: 'artist', artist: row.artist }
     case 'album':
@@ -140,7 +175,9 @@ export function LibraryTree({
   activeSongId,
   onNav,
   onOpenSong,
+  onOpenPlaylist,
   onPlaySong,
+  onToggleFavorite,
   onMenu
 }: Props): React.JSX.Element {
   const tree = useLibraryTree()
@@ -168,12 +205,14 @@ export function LibraryTree({
     (row: TreeRow) => {
       if (row.kind === 'nav') {
         if (row.id === 'artists') tree.toggleArtists()
+        else if (row.id === 'playlists') tree.togglePlaylists()
         onNav(row.id)
-      } else if (row.kind === 'artist') tree.toggleArtist(row.artist.id)
+      } else if (row.kind === 'playlist') onOpenPlaylist(row.playlist)
+      else if (row.kind === 'artist') tree.toggleArtist(row.artist.id)
       else if (row.kind === 'album') tree.toggleAlbum(row.artist.id, row.album.id)
       else if (row.kind === 'song') onOpenSong(row.song)
     },
-    [tree, onNav, onOpenSong]
+    [tree, onNav, onOpenSong, onOpenPlaylist]
   )
 
   const menu = useCallback(
@@ -202,9 +241,7 @@ export function LibraryTree({
         return move(rows.length - 1)
       case 'ArrowRight': {
         e.preventDefault()
-        const expandable =
-          (row.kind === 'nav' && row.expandable) || row.kind === 'artist' || row.kind === 'album'
-        if (expandable && 'expanded' in row && !row.expanded) activate(row)
+        if (isExpandable(row) && 'expanded' in row && !row.expanded) activate(row)
         else if (rows[safeFocus + 1] && rows[safeFocus + 1]!.level > row.level)
           focusRow(safeFocus + 1)
         return
@@ -249,6 +286,7 @@ export function LibraryTree({
           activeSongId,
           activate,
           playSong: onPlaySong,
+          toggleFavorite: onToggleFavorite,
           menu,
           onFocusRow: setFocusIndex
         }}

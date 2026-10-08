@@ -781,7 +781,7 @@ export class PlayerEngine {
       })
     })
 
-    api.playerFinished.on(() => set({ playing: false }))
+    api.playerFinished.on(() => set((s) => ({ playing: false, songEnded: s.songEnded + 1 })))
 
     api.error.on((e) => this.fail(e))
   }

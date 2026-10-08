@@ -8,6 +8,8 @@ interface Props {
   onEdit: (song: Song) => void
   onDelete: (song: Song) => void
   onPlay: (song: Song) => void
+  onToggleFavorite: (song: Song) => void
+  onAddToPlaylist: (song: Song) => void
   onGone: () => void
 }
 
@@ -18,7 +20,15 @@ function fmtDuration(ms: number | null): string | null {
 }
 
 /** Song header (cover, tags) plus a file health list so missing files are explained, never fatal (LIB-5, LIB-8). */
-export function SongDetail({ songId, onEdit, onDelete, onPlay, onGone }: Props): React.JSX.Element {
+export function SongDetail({
+  songId,
+  onEdit,
+  onDelete,
+  onPlay,
+  onToggleFavorite,
+  onAddToPlaylist,
+  onGone
+}: Props): React.JSX.Element {
   const [song, setSong] = useState<Song | null>(null)
   const [checks, setChecks] = useState<FileCheck[]>([])
   const [version, setVersion] = useState(0)
@@ -62,6 +72,18 @@ export function SongDetail({ songId, onEdit, onDelete, onPlay, onGone }: Props):
             </button>
             <button type="button" className={btn} onClick={() => onEdit(song)}>
               Edit
+            </button>
+            <button type="button" className={btn} onClick={() => onAddToPlaylist(song)}>
+              Add to play list…
+            </button>
+            <button
+              type="button"
+              className={btn}
+              aria-pressed={song.favorite}
+              aria-label={song.favorite ? 'Remove from favorites' : 'Add to favorites'}
+              onClick={() => onToggleFavorite(song)}
+            >
+              {song.favorite ? '♥ Favorite' : '♡ Favorite'}
             </button>
             <button type="button" className={btn} onClick={() => onDelete(song)}>
               Delete
