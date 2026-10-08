@@ -8,7 +8,7 @@ Each phase = one GitHub **milestone**, one **branch**, one **release tag**. Scop
 2. Work the milestone's issues. Commit often (conventional commits, reference `#issue`). Docs are updated in the same branch as the code.
 3. Before merging: lint, typecheck and tests green; milestone acceptance criteria demonstrated; CHANGELOG entry added.
 4. Open a PR `phase/mN-<slug>` → `main` whose body lists `Closes #…` for every issue in the phase. Merge with a **merge commit** (keeps phase history visible).
-5. On `main`: tag the release (`vX.Y.0`, annotated), push the tag, **close the milestone**. Delete the phase branch.
+5. On `main`: tag the release (the tag push triggers the release workflow, which builds all platforms and publishes the GitHub Release; wait for it to go green before closing the milestone) (`vX.Y.0`, annotated), push the tag, **close the milestone**. Delete the phase branch.
 6. Start the next phase from the new `main`.
 
 No phase starts until the previous one is merged and tagged.
@@ -31,8 +31,8 @@ Baseline tag `v0.0.0` marks the docs-only starting point.
 ## Phase detail
 
 ### M0 — Scaffold & Shell (v0.1.0)
-Scaffold electron-vite + React + TS; Tailwind with theme tokens; lint/format/test tooling; CI; secure window baseline (preload, CSP); frameless window with custom title bar and controls; resize handling; left hamburger flyout (File/Help); persisted window bounds.
-**Accept:** app launches on Linux; flyout opens/closes; CI green. Covers WIN-1…5, NFR-4 (baseline).
+Scaffold electron-vite + React + TS; Tailwind with theme tokens; lint/format/test tooling; CI; **electron-builder config and tag-triggered release workflow building every OS/arch (SPECS §11)**; secure window baseline (preload, CSP); frameless window with custom title bar and controls; resize handling; left hamburger flyout (File/Help); persisted window bounds.
+**Accept:** app launches on Linux; flyout opens/closes; CI green; pushing `v0.1.0` produces a GitHub Release with Linux x64/arm64, Windows, macOS x64/arm64 installers. Covers WIN-1…5, NFR-4 (baseline), NFR-7.
 
 ### M1 — Library (v0.2.0)
 SQLite + migration runner + schema 001; repository layer; managed library store and `tabking://` protocol; ID3 reader; Add/Edit/Delete song dialogs; Artist→Album→Song tree (virtualized); context menus; cover art; missing-file handling.
@@ -59,7 +59,7 @@ Preferences dialog; themes; folder locations with migration; audio prefs; backup
 **Accept:** backup → wipe → restore round trip passes. Covers PRF-1…3, BKP-1/2, HLP-1, ABT-1/2.
 
 ### M7 — Release 1.0 (v1.0.0)
-electron-builder targets; release workflow; accessibility pass; performance pass; e2e suite; license audit and NOTICE; cross-platform manual QA; user docs.
+signing hooks and smoke-test of installers, SHA-pinned actions; accessibility pass; performance pass; e2e suite; license audit and NOTICE; cross-platform manual QA; user docs.
 **Accept:** installers build and run on Linux x64/ARM64, Windows, macOS; GitHub Release published. Covers NFR-1, 2, 5, 7, 8.
 
 ## Labels

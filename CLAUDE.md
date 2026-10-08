@@ -41,5 +41,5 @@ Docs first, then code. Follow [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md): one 
 1. Branch from up-to-date `main`; work the milestone's issues; commit with `#issue` references.
 2. Lint/typecheck/tests green and acceptance criteria met; update docs and CHANGELOG.
 3. PR to `main` with `Closes #…` for every phase issue; merge commit.
-4. Tag `vX.Y.0` on `main` (annotated), push tag, close the milestone, delete the branch.
+4. Tag `vX.Y.0` on `main` (annotated) after bumping `package.json` + CHANGELOG; the tag push runs `.github/workflows/release.yml` (builds Linux x64/arm64, Windows, macOS x64/arm64 and publishes the Release). Once it is green, close the milestone and delete the branch.
 5. Don't start the next phase until the previous is merged and tagged.

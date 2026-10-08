@@ -151,15 +151,44 @@ Dialog sections: Appearance (theme), Locations (library, backup folder), Audio (
 
 ## 11. Build and release
 
-- electron-builder targets: Linux AppImage+deb (x64, arm64), Windows NSIS (x64), macOS dmg (x64+arm64).
-- GitHub Actions: lint, typecheck, test on push; tagged `v*` builds matrix and publishes Release assets (what the update check reads). Version from `package.json`, SemVer.
-- better-sqlite3 rebuilt for Electron ABI (`electron-builder install-app-deps`).
+### 11.1 Packaging
+- electron-builder (`electron-builder.yml`), `npm run dist` builds for the host OS/arch only; native modules (better-sqlite3) are rebuilt per target by building **on a runner of that architecture** (no cross-compiling).
+- Artifact names: `tab-king-<version>-<os>-<arch>.<ext>`.
+
+| Target | Runner | Arch | Artifacts |
+| --- | --- | --- | --- |
+| Linux | `ubuntu-24.04` | x64 | AppImage, deb |
+| Linux | `ubuntu-24.04-arm` | arm64 | AppImage, deb |
+| Windows | `windows-latest` | x64 | NSIS installer (.exe), portable .exe |
+| macOS | `macos-15-intel` | x64 | dmg, zip |
+| macOS | `macos-latest` | arm64 | dmg, zip |
+
+### 11.2 CI workflow (`.github/workflows/ci.yml`)
+On push/PR: `npm ci`, lint, typecheck, unit tests (Linux). Matrix smoke build (`electron-builder --dir`) added in M7.
+
+### 11.3 Release workflow (`.github/workflows/release.yml`)
+Triggers: `push` of tags `v*.*.*`, plus manual `workflow_dispatch` (build only, uploads artifacts, **no release**) for dry runs.
+
+1. **verify** job — checks the tag equals `v` + `package.json` version (fail otherwise), and that `CHANGELOG.md` has a section for it.
+2. **build** job — matrix over the table above (`fail-fast: false`): checkout, `actions/setup-node` (version from `.nvmrc`, npm cache), `npm ci`, lint/typecheck/test, `npx electron-builder --publish never`, upload the installers with `actions/upload-artifact` (one artifact per matrix entry). Permissions: `contents: read`.
+3. **release** job (`needs: [verify, build]`, only on tag push) — downloads all artifacts, writes `SHA256SUMS.txt`, extracts the CHANGELOG section as notes, and runs `gh release create <tag> --verify-tag --notes-file … files…`. Permissions: `contents: write` for this job only. The release is **not** created if any matrix leg fails, so a release never ships a partial set of platforms.
+4. Pre-releases: tags containing a hyphen (`v1.2.0-rc.1`) are marked pre-release. Phase tags `v0.x.0` are normal releases, so GitHub's `releases/latest` (used by the in-app update check, ABT-2) works throughout.
+
+Re-running: deleting a failed tag/release and re-pushing the tag, or re-running failed jobs, is safe because release creation is the last step.
+
+### 11.4 Signing and trust
+- v1.0 ships **unsigned**; SHA256SUMS published. README documents the Windows SmartScreen prompt and macOS "open anyway"/`xattr -d com.apple.quarantine` steps. macOS arm64 builds are ad-hoc signed (required to run).
+- The workflow reads optional secrets (`CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`, `WIN_CSC_LINK`) — when present electron-builder signs/notarizes; when absent it builds unsigned. No code change needed later to enable signing.
+- Third-party actions pinned to major versions (SHA-pin in M7 hardening); no secrets exposed to PR builds.
+
+### 11.5 Versioning
+SemVer in `package.json`; the phase tag table in PROJECT_PLAN gives each milestone's version. Bumping the version and CHANGELOG is part of each phase's wrap-up issue.
 
 ## 12. Milestones
 
 | M | Deliverable | Acceptance |
 | --- | --- | --- |
-| M0 | Scaffold, CI, frameless window, title bar, left flyout, theme tokens | App launches on Linux; menu flyout works; lint/test green |
+| M0 | Scaffold, CI, **release pipeline (all 5 build targets)**, frameless window, title bar, left flyout, theme tokens | App launches on Linux; menu flyout works; lint/test green; tagged v0.1.0 produces a GitHub Release with installers for every target |
 | M1 | DB + migrations, library store, Add/Edit song w/ ID3, Artist tree, context menus | Add a song with GP+MP3; appears under Artist→Album→Song |
 | M2 | alphaTab render + synth playback, footer controls, metronome, count-in, loop/select, speed | Play a GP file; loop 4 bars at 60% with count-in |
 | M3 | Multi-track panel: solo/mute/volume, per-track view | Play each track separately |
