@@ -2,6 +2,24 @@
 
 All notable changes to Tab King. Format: [Keep a Changelog](https://keepachangelog.com/), versions follow [SemVer](https://semver.org/).
 
+## [0.7.0] - 2026-10-08
+
+### Added
+
+- **Preferences** (File → Preferences): Appearance, Locations, Audio and App data. Changes apply immediately and are kept in the settings file, so a restore never changes them.
+- **Themes**: System (follows the OS live), Light, Dark, plus two colour themes, **Midnight** and **Amber**. Every theme is checked against WCAG AA contrast in the unit tests.
+- **Library and backup folders**: change either with a folder picker. Moving the library offers to **copy the files** (verified, with progress, undone completely if anything fails) and then to remove the old copies, touching only the files that were copied. A library folder must be new, empty or already a Tab King library.
+- **Audio preferences**: choose the output device (synth, MP3 playback, metronome and count-in), whether the metronome and count-in start switched on, and a custom **SoundFont** (.sf2/.sf3) that replaces the built-in bank live.
+- **Backup** (File → Backup / Restore): one .zip with a consistent copy of the database, every library file and a manifest, with a progress bar.
+- **Restore**: pick a backup, see what is inside, confirm; the archive and its database are fully extracted and validated (including migrations for older backups) before anything is replaced, the swap is undone if it fails, and Tab King restarts on the restored library. Archives from a newer version, non-backups and archives with unsafe paths are refused.
+- **Help** (Help → Help Contents): a right-hand flyout with a table of contents and twelve bundled topics, with links between topics.
+- **About** (Help → About): version, license, links and a **Check for updates** button that asks GitHub Releases for the latest version — only when you press it. Nothing is downloaded or installed automatically.
+
+### Changed
+
+- The app version shown and used for the update check is now baked in from `package.json` at build time.
+- New runtime dependencies: `yazl` and `yauzl` (zip writing and reading, both MIT).
+
 ## [0.6.0] - 2026-10-08
 
 ### Added

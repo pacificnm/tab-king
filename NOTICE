@@ -26,3 +26,5 @@ better-sqlite3                    MIT
 music-metadata                    MIT
 zod                               MIT
 signalsmith-stretch               MIT       https://signalsmith-audio.co.uk/code/stretch/
+yazl (zip writer)                 MIT       https://github.com/thejoshwolfe/yazl
+yauzl (zip reader)                MIT       https://github.com/thejoshwolfe/yauzl

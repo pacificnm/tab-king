@@ -4,6 +4,8 @@ interface Props {
   source: string
   /** Called for `help:<topic>` links. */
   onTopic: (id: string) => void
+  /** Leave out a leading level-1 heading (the flyout already shows the topic's title in its header). */
+  omitTitle?: boolean
 }
 
 function Inlines({
@@ -135,12 +137,14 @@ function BlockView({
 }
 
 /** Renders one help topic. Content is parsed to data and rendered through React, never as HTML. */
-export function Markdown({ source, onTopic }: Props): React.JSX.Element {
+export function Markdown({ source, onTopic, omitTitle }: Props): React.JSX.Element {
   return (
     <div className="flex select-text flex-col gap-3 text-sm">
-      {parseMarkdown(source).map((b, i) => (
-        <BlockView key={i} block={b} onTopic={onTopic} />
-      ))}
+      {parseMarkdown(source)
+        .filter((b, i) => !(omitTitle && i === 0 && b.kind === 'heading' && b.level === 1))
+        .map((b, i) => (
+          <BlockView key={i} block={b} onTopic={onTopic} />
+        ))}
     </div>
   )
 }

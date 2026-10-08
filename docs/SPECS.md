@@ -28,9 +28,9 @@ Implements [REQUIREMENTS.md](REQUIREMENTS.md). IDs in brackets trace back to req
 ### Directory layout
 
 ```
-src/main/        index.ts, window.ts, ipc/, db/ (migrations/, repo/), library/, backup/, update/
+src/main/        index.ts, window.ts, ipc.ts, db/ (migrations/, repo/), library/, prefs/, backup/, update/
 src/preload/     index.ts
-src/renderer/    app/, components/, features/{nav,player,song,prefs,help}/, player/, styles/
+src/renderer/    app/, components/, features/{nav,library,playlist,player,song,prefs,help,about}/, player/, styles/
 src/shared/      types.ts, ipc-contract.ts
 resources/       soundfont, icons, help/*.md
 docs/ tests/
@@ -43,7 +43,7 @@ docs/ tests/
 - Resizing: frameless windows resize natively on Windows/macOS; on Linux add invisible 4 px resize handles if the WM doesn't provide them (verify per WM).
 - Title bar order: hamburger · app title · menu bar (File, Help) · drag space · window buttons. The menu bar (`MenuBar`) is an ARIA `menubar` with drop-down `menu`s: File → Preferences, Backup / Restore; Help → Help Contents, About. Arrow keys move between items/menus, Enter activates, Esc closes; hovering another top-level item while one is open switches menus.
 - Left flyout (`Flyout` + `NavMenu`): React slide-in panel (≈280 px) over content with backdrop; contains library navigation only (Search, Play Lists, Favorites, Artists); focus-trapped, Esc closes.
-- Right help flyout: slide-in panel with TOC list (from `resources/help/toc.json`) and rendered Markdown (react-markdown).
+- Right help flyout (`HelpFlyout`, ≈28 rem): slide-in panel with a TOC list (from `resources/help/toc.json`) and the selected topic rendered from bundled Markdown (§8).
 - Window bounds saved to `settings` (debounced).
 
 ## 3. Data model (SQLite) [LIB-*]
@@ -194,18 +194,41 @@ Measured (this repo's e2e harness, Linux x64 desktop, Electron 44): 1000 Hz test
 
 ## 7. Preferences [PRF-*]
 
-Dialog sections: Appearance (theme), Locations (library, backup folder), Audio (output device via `setSinkId`, defaults, SoundFont), About app data (DB path, size).
+Opened from File → Preferences (`PreferencesDialog`, a modal with a vertical tab list: Appearance, Locations, Audio, App data). Every change applies immediately; there is no Save button.
 
-- Themes: CSS variables on `<html data-theme>`; Tailwind config maps colors to variables. Built-ins: light, dark, system, "midnight" (blue), "amber".
-- Changing library folder: confirm, copy files, update `settings.library_dir`, verify, then offer to remove old files.
-- Default locations: `app.getPath('userData')` for DB; `~/Music/TabKing` for library; `~/Documents/TabKing Backups`.
+**Storage.** Preferences live in the settings file (`<userData>/settings.json`, key `prefs`), not in the library database, so a restore never changes them and they are readable before the database opens. `PreferencesStore` (`src/main/prefs/preferences.ts`) validates the stored JSON field by field with zod (`.catch` defaults), so a damaged or hand-edited file falls back to defaults instead of blocking start-up. The renderer reads a `PreferencesView` (the stored values plus computed facts: SoundFont URL, folder paths, database size) through `window.api.prefs.get()`, changes theme and audio fields with `prefs.update(patch)` (validated against `PreferencesPatchSchema`), and receives `prefs:changed` broadcasts. Locations and the SoundFont have their own calls because they involve file operations.
+
+**Themes [PRF-1].** CSS variables on `[data-theme]`; Tailwind maps colour utilities to them. Built-ins: **system** (resolves to light or dark and follows the OS live), **light**, **dark**, **midnight** (blue-tinted dark) and **amber** (warm paper-like light). `tests/unit/themes.test.ts` parses `index.css` and enforces WCAG AA (4.5:1) for text, muted text and the accent on every surface, accent-foreground on the accent, and the danger colour. The chosen theme is cached in `localStorage` so the next start paints correctly before preferences load. The tab sheet is always rendered on white paper, whatever the theme.
+
+**Locations [PRF-2].** Defaults: database `<userData>/library.db`, library `<userData>/library`, backups `~/Documents/TabKing Backups`.
+
+- A managed library folder always holds a `.tabking-library` marker (written at start-up for the active folder). A new library folder must be empty, not yet exist, or already carry the marker; it may not contain or sit inside the current library. This guarantees Tab King never adopts — and later restores over or deletes from — a folder with someone else's files in it.
+- Changing the library (`LibraryMoveDialog`): pick a folder (`prefs.chooseLibraryDir`, which checks it and returns a one-time token plus the number and size of files to copy), then choose _Copy files and switch_, _Switch without copying_ or (for an existing library) _Use this folder_ (`prefs.applyLibraryDir`). Copying never overwrites, verifies each file's size, reports progress, and on any failure removes what it copied and leaves the old library untouched. The new folder is saved only after the copy succeeded. The renderer then offers _Remove old files_ (`prefs.removeOldLibrary`), which deletes only the files that were copied, the marker and folders left empty — never anything else in the old folder.
+- The backup folder (`prefs.chooseBackupDir` / `resetBackupDir`) must be writable and may not be inside the library.
+- Backups, restores and library moves are mutually exclusive (a second request gets "Please wait: …").
+
+**Audio [PRF-3].**
+
+- _Output device_: a list from `navigator.mediaDevices.enumerateDevices()` (labels may be blank until the app is allowed to use audio devices, so entries fall back to "Output device N"; a saved device that is not connected is shown as such). `player/audio-output.ts` calls `AudioContext.setSinkId` on the MP3 engine's and the count-in's contexts; `PlayerEngine.setOutputDevice` calls alphaTab's `setOutputDevice` for the synth once its player is ready. An unavailable device leaves the context on whatever it was using.
+- _Defaults_: "Metronome on" and "Count-in on" set those switches when the app starts and whenever the preference changes.
+- _SoundFont_: _Choose SoundFont…_ takes a `.sf2`/`.sf3` (RIFF `sfbk` header checked), copies it to `<userData>/soundfonts/` under a safe unique name, and serves it as `tabking://soundfonts/<name>`; `PlayerEngine.setSoundFont` reloads the synth live (pausing first). _Use built-in bank_ deletes the copy and returns to the Sonivox bank.
 
 ## 8. Backup / restore, help, about [BKP-_, HLP-_, ABT-*]
 
-- Backup: SQLite `VACUUM INTO` temp file → zip (archiver) with `manifest.json {appVersion, schemaVersion, createdAt}`, `tabking.db`, `library/**`. Progress events to UI.
-- Restore: validate zip + manifest (schema ≤ app's), close DB, extract to temp dir, swap with the current data (kept as `.bak` until success), reopen and run migrations; on error roll back.
-- Help Contents: `resources/help/*.md` + `toc.json`; right flyout with TOC and article view.
-- About modal: name, version (`app.getVersion()`), license, repo link. **Check for updates** → main calls `GET https://api.github.com/repos/pacificnm/tab-king/releases/latest`, compares semver with `app.getVersion()`, returns `{upToDate, latest, url}`; errors shown inline. Only on click.
+**Backup [BKP-1]** (`src/main/backup/backup.ts`). `VACUUM INTO` a temporary file (a consistent snapshot even while the app runs), then one zip (`yazl`, MIT) named `TabKing-backup-YYYY-MM-DD-HHMMSS.zip` in the backup folder containing `manifest.json` (`{format: 1, appVersion, schemaVersion, createdAt, songCount, fileCount}`), `tabking.db` and `library/**`. Already-compressed files (MP3, images, Guitar Pro) are stored, not deflated. The archive is written as `.part` and renamed on completion; progress events (`task:progress`) drive a progress bar.
+
+**Restore [BKP-2]** (`src/main/backup/restore.ts`, read with `yauzl`, MIT). Pick the archive (`backup.choose`): its entry names are checked (only `manifest.json`, `tabking.db` and `library/…`; no absolute, `..`, backslash or drive-letter paths — zip slip), the manifest is validated, and a backup from a newer schema than the app is refused. The dialog shows what is inside and warns that the library will be replaced. On confirmation (`backup.restore`):
+
+1. Extract to staging next to the live data (`library.db.restoring`, `<library>.restoring`). Anything wrong here stops with nothing changed.
+2. Validate the extracted database: `PRAGMA integrity_check`, then run all migrations on it (older backups are upgraded) — still without touching live data.
+3. Close the live database, rename the current database (and its `-wal`/`-shm`) and library to `*.pre-restore-<time>`, rename the staging copies into place. If any rename fails, the renames are undone and the previous data is back.
+4. Delete the `.pre-restore-*` copies, then restart the app (`app.relaunch`, or the `.AppImage` itself on Linux), which reopens the restored database. If the swap failed after the database was closed, the app also restarts so it runs on the restored-back data.
+
+Preferences are not part of a backup. Under the e2e harness (`TABKING_E2E`) the app exits instead of relaunching and the test starts it again.
+
+**Help [HLP-1].** `resources/help/toc.json` (`[{id, title, file}]`) and one Markdown file per topic, served read-only at `tabking://app/help/` (the `app` host allows `soundfont/`, `font/` and `help/`). `parseToc` drops entries with unsafe ids or file names. A small in-house Markdown reader (`features/help/markdown.ts`) turns a topic into data — headings, paragraphs, bullet/numbered lists, fenced code, quotes, pipe tables and **bold**, _italic_, `code` and links — and React renders it; there is no HTML path. Only `https:` links (opened in the system browser) and `help:<topic>` links (jump to a topic) are kept. A unit test checks that every `help:` link in the bundled topics exists.
+
+**About [ABT-1/2]** (`AboutDialog`). Name, version (baked in from `package.json` at build time, `__APP_VERSION__`), license (Apache-2.0), copyright, links (project, issues, license, notices). **Check for updates** is the only thing that contacts GitHub: main calls `GET https://api.github.com/repos/pacificnm/tab-king/releases/latest` (10 s timeout), compares `tag_name` with the running version using semver precedence (`update/semver.ts`; prereleases sort before their release), and returns `{status: 'up-to-date' | 'available', current, latest, url}`. The link is only kept if it points into `github.com/pacificnm/tab-king/`. Network, rate-limit (403/429), 404, other HTTP and malformed answers each produce a readable inline message. Nothing is downloaded or installed, and nothing is checked without a click. Under `TABKING_E2E` the endpoint can be overridden with `TABKING_UPDATE_URL` so tests can use a local stand-in.
 
 ## 9. Licensing and third-party
 
@@ -217,8 +240,8 @@ Dialog sections: Appearance (theme), Locations (library, backup folder), Audio (
 ## 10. Testing
 
 - Unit (Vitest): sync-map, audibleSet mixing, repo/queries on in-memory SQLite (including FTS trigger sync, an upgrade from the previous schema, and a 5,000-song performance check against the 200 ms budget), queue logic, filename sanitiser, semver compare.
-- Integration: migrations from empty and from each prior version; backup→restore round trip.
-- E2E (Playwright-Electron): add song, browse tree, search, favorites, play lists (incl. drag-and-drop and persistence), queue auto-advance, play/loop, preferences theme, backup/restore, about/update (mocked GitHub). Library-scale scenarios seed the database directly (`tests/e2e/seed.ts`) instead of going through the Add dialog; `scale.spec.ts` seeds 5,000 songs and measures IPC calls and the visible UI inside the page.
+- Integration: migrations from empty and from each prior version; backup→restore round trip (real files and a real SQLite database: songs, search index and library files come back; an older-schema backup is migrated; a non-backup, a newer-schema backup and a zip-slip archive are refused without changing anything; a failing swap puts the old data back).
+- E2E (Playwright-Electron): add song, browse tree, search, favorites, play lists (incl. drag-and-drop and persistence), queue auto-advance, play/loop, preferences (themes and persistence, audio defaults, SoundFont, moving the library with and without removing old files, backup folder), backup → wipe → restore (with an app restart), help flyout, about and update check (against a local stand-in for GitHub). Library-scale scenarios seed the database directly (`tests/e2e/seed.ts`) instead of going through the Add dialog; `scale.spec.ts` seeds 5,000 songs and measures IPC calls and the visible UI inside the page.
 - Manual checklist per platform for frameless window behavior and audio devices.
 - Fixtures: GP and MIDI files and tag-only MP3s are generated programmatically (`tests/e2e/fixtures.ts`, via alphaTab's exporter/MIDI generator and a hand-built ID3v2 tag). Real audio fixtures — 24 s of 50 ms beeps every 500 ms (120 bpm) at three pitches — are checked in under `tests/fixtures/` (see its README for the ffmpeg command).
 - **Drift test** (`tests/e2e/drift.spec.ts`, SYN-4): a probe on the audio output records each beep as it reaches the listener; a trace of the cursor on the same clock gives the cursor position at that moment; the sync map says where the beep belongs. Real-time drift must stay ≤ 30 ms for the typical beep (90th percentile; a hard ceiling of 60 ms catches regressions while tolerating a rare main-thread stall, since the cursor is drawn on animation frames) for: 100%, 60% and 150% speed (and pitch preserved), a start offset with tempo-warping sync points, a speed change mid-play, seeking mid-play, and loop wraps. Beeps within a short window of a deliberate jump are skipped. Observed over repeated full runs: 90th percentile 6–23 ms, worst single beep ≤ 25 ms. The probe is only active when the harness sets `TABKING_E2E`.

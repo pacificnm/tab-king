@@ -15,6 +15,7 @@ import {
   type TaskProgress,
   type UpdateCheck
 } from '@shared/types'
+import { appVersion } from '../app-version'
 import { createBackup, backupDirProblem } from '../backup/backup'
 import { RestoreFailure, readArchiveInfo, restoreArchive } from '../backup/restore'
 import { LATEST_SCHEMA_VERSION, MIGRATIONS, type Db } from '../db/connection'
@@ -257,7 +258,7 @@ export function registerPrefsIpc(deps: PrefsIpcDeps): void {
         sender(e)
         const progress = progressSender('backup')
         return createBackup(
-          { db, libraryRoot: libraryDir(), backupDir: backupDir(), appVersion: app.getVersion() },
+          { db, libraryRoot: libraryDir(), backupDir: backupDir(), appVersion: appVersion() },
           (done, total) => progress(done, total, 'Writing backup…')
         )
       })
@@ -317,7 +318,7 @@ export function registerPrefsIpc(deps: PrefsIpcDeps): void {
       sender(e)
       // The e2e harness points this at a local stand-in for GitHub.
       const url = (process.env['TABKING_E2E'] && process.env['TABKING_UPDATE_URL']) || RELEASES_URL
-      return checkForUpdates(app.getVersion(), (u, init) => fetch(u, init), url)
+      return checkForUpdates(appVersion(), (u, init) => fetch(u, init), url)
     })
   )
 }

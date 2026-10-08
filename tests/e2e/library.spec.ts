@@ -60,7 +60,8 @@ test('context menu offers Add, Edit, Play and delete removes the song and its fi
   await expect(page.getByRole('dialog', { name: 'Delete song' })).toBeHidden()
   await page.getByRole('button', { name: 'Library menu' }).click()
   await expect(page.getByText('No songs yet')).toBeVisible()
-  expect(readdirSync(join(tmp, 'ud', 'library'))).toEqual([])
+  // only the marker that identifies the folder as Tab King's remains
+  expect(readdirSync(join(tmp, 'ud', 'library'))).toEqual(['.tabking-library'])
 })
 
 test('a song with a missing file is reported, not fatal', async () => {

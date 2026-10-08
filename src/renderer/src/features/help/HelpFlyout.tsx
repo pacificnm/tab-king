@@ -108,7 +108,7 @@ export function HelpFlyout({
             </p>
           ) : (
             <article aria-label={topic.title}>
-              <Markdown source={loaded.text} onTopic={showTopic} />
+              <Markdown source={loaded.text} onTopic={showTopic} omitTitle />
             </article>
           )}
         </div>
