@@ -105,17 +105,17 @@ Folder scanning/watching, cloud sync, multi-user, tab editing/authoring, online 
 
 ## 10. Decisions log
 
-| Decision      | Choice                                                                                   |
-| ------------- | ---------------------------------------------------------------------------------------- |
-| License       | Apache-2.0 (permissive, patent grant, compatible with alphaTab MPL-2.0 and Electron MIT) |
-| Tab engine    | alphaTab                                                                                 |
-| MP3 sync      | Start offset + measure sync points                                                       |
-| Audio modes   | Per-track choice of synth/MIDI or MP3; speed works for both (pitch-preserved for MP3)    |
-| Platforms     | Linux x64/ARM64, Windows, macOS                                                          |
-| Import        | Manual add only                                                                          |
-| File storage  | Copied into managed library folder                                                       |
-| Library scope | Standard: full-text search, ordered playlists, favorites, queue                          |
-| Count-in      | Exactly 3 audible clicks at the song tempo (and current speed), then playback starts     |
+| Decision      | Choice                                                                                                                         |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| License       | Apache-2.0 (permissive, patent grant, compatible with alphaTab MPL-2.0 and Electron MIT)                                       |
+| Tab engine    | alphaTab                                                                                                                       |
+| MP3 sync      | Start offset + measure sync points                                                                                             |
+| Audio modes   | Per-track choice of synth/MIDI or MP3; speed works for both (pitch-preserved for MP3). Synth and MP3 can't sound together (v1) |
+| Platforms     | Linux x64/ARM64, Windows, macOS                                                                                                |
+| Import        | Manual add only                                                                                                                |
+| File storage  | Copied into managed library folder                                                                                             |
+| Library scope | Standard: full-text search, ordered playlists, favorites, queue                                                                |
+| Count-in      | Exactly 3 audible clicks at the song tempo (and current speed), then playback starts                                           |
 
 ## 11. Open questions
 

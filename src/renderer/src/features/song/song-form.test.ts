@@ -146,6 +146,7 @@ describe('validation and output', () => {
       masterSource: 'mp3',
       synthSource: 'midi',
       syncOffsetMs: 120,
+      syncPoints: [],
       durationMs: 1000,
       tracks: [
         {

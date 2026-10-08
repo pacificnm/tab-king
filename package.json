@@ -1,6 +1,6 @@
 {
   "name": "tab-king",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Desktop guitar tab player with Guitar Pro playback and synced MP3 tracks",
   "author": "Jaimie Garner <pacificnm@gmail.com>",
   "license": "Apache-2.0",
@@ -55,6 +55,7 @@
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "react-window": "^2.3.3",
+    "signalsmith-stretch": "1.3.2",
     "zod": "^4.6.5",
     "zustand": "^5.0.15"
   },

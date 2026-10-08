@@ -128,22 +128,52 @@ Main region = alphaTab surface + track panel (collapsible, left or top). Static 
 - When the player is showing, the library views underneath are `inert` so keyboard focus cannot linger on hidden controls.
 - Tracks: `api.renderTracks([...])` and `changeTrackSolo/Mute/Volume` arrive with M3.
 
-### 6.3 Audio sources and MP3 engine [TRK-3/4, SYN-*]
+### 6.3 Audio sources and MP3 engine [TRK-3/4/5, SYN-*, PLY-6]
 
-Per track and for master, `source ∈ {synth, mp3}`.
+Per track and for the master, `source ∈ {synth, mp3}` (stored in `song_track.source` and `song.master_source`; a source of `mp3` needs an attached file).
 
-- **Synth source:** alphaTab's built-in synth; track's MIDI channel unmuted.
-- **MP3 source:** alphaTab's _external media_ mode (`ExternalMediaHandler`/backing-track sync): our `Mp3Engine` owns `AudioContext` buffers for the master + stems and implements `play/pause/seek/rate/volume`, reporting its time to alphaTab. alphaTab maps MP3 time → tick via the song's **sync points** (`FlatSyncPoint[]`: bar index, modified tempo, millisecond offset), which handles tempo drift.
-- Mixing rule: for each track, exactly one source is audible. Master MP3 on → synth tracks muted unless a track explicitly uses synth; stem MP3 selected → master MP3 muted for that instrument's solo view. Concretely the engine computes `audibleSet` on every change; unit tested.
-- **Speed:** synth via `playbackSpeed`; MP3 via time-stretch with pitch preservation (`AudioBufferSourceNode.playbackRate` + SoundTouch/`soundtouchjs` worklet, or `HTMLAudioElement.preservesPitch`). Spike required in M4 to pick; acceptance = no audible pitch change from 50%–150%.
-- All stems must be decoded to the same sample rate/length alignment; one shared clock (`AudioContext.currentTime`) drives all stems so they stay sample-aligned. Target drift ≤ 30 ms [SYN-4].
+**Two playback modes share one alphaTab instance** and are switched at runtime (`api.settings.player.playerMode` + `updateSettings()`, which re-creates the player; position, range, loop, speed and playing state are carried across):
+
+- `synth` — alphaTab's synthesizer is the clock (everything in §6.2).
+- `mp3` — alphaTab runs in **external-media mode**. Our `Mp3Engine` is the clock: alphaTab keeps owning looping, the playback range, speed, seeking and the cursor, and calls our handler (`play`, `pause`, `seekTo`, `playbackRate`, `masterVolume`); we report the audio's position back with `output.updatePosition(ms)` every animation frame, and alphaTab turns it into a tab position through the **sync points** (below).
+
+**Which mode and which audio — `planPlayback` (`mix-plan.ts`, unit-tested) [TRK-4, TRK-5]:**
+
+1. _Practicing a track_ plays that track's stem if its source is `mp3`, otherwise the synth; the master is silent.
+2. Otherwise, if the band source is the **master MP3**, the master plays alone (it is one pre-mixed recording, so per-track mute/solo/volume cannot apply to it).
+3. Otherwise each audible track (mute/solo as in M3) plays from its own source. If any plays from a stem the MP3 engine runs at the track's volume; if none does, the synth runs.
+
+**Known limitation — synth and MP3 cannot sound together.** alphaTab's external-media mode has no synthesizer, so a synth-sourced track that should be heard while MP3 audio plays stays silent; the track panel says so explicitly (`silencedSynthTracks`). A source that fails to load (missing/undecodable file) is reported and the plan is recomputed without it, falling back to the synth. The metronome is synth-only and is disabled in `mp3` mode.
+
+**`Mp3Engine` (`mp3-engine.ts`).** One `AudioContext` for everything, so all sources share one clock. Each source is fetched over `tabking://`, decoded (`decodeAudioData`), padded with `PAD_MS` (8 s) of leading silence — so a **negative start offset** needs no special case — and handed to its own stretch node and gain node. Playback is _scheduled_, not streamed: `schedule({output, input, rate, active})` with `output` = context time. The position model is `position(t) = input + (t − output) · rate`, so the engine knows exactly where every source is without polling the worklet, and a late-joining source is lined up by scheduling it at the current model position. Mute/solo/stem switching only ramps gains (20 ms), so switching between master and stems never restarts audio. Decoded audio is large (~85 MB for 4 min of stereo), so a memory budget (640 MB) evicts least-recently-used sources that the current plan does not need; remaining stems are preloaded in the background while under 400 MB.
+
+**Spike #40 — pitch-preserving time-stretch: decision.**
+
+| Candidate                                          | Licence  | Verdict                                                                                                                                                                                                                          |
+| -------------------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `soundtouchjs` (`AudioBufferSourceNode` + stretch) | LGPL-2.1 | Rejected: LGPL is a poor fit for an Apache-2.0 app that bundles its dependencies, and it only offers rate changes on a node, not scheduled positions.                                                                            |
+| `@soundtouchjs/audio-worklet`                      | MPL-2.0  | Viable, but a single processor per stream without position scheduling; we would have to build alignment ourselves.                                                                                                               |
+| `HTMLAudioElement.preservesPitch`                  | —        | Rejected: no sample-accurate clock, seeks are slow, and several elements cannot be kept aligned.                                                                                                                                 |
+| **`signalsmith-stretch`** (JS/WASM AudioWorklet)   | MIT      | **Chosen.** Works on loaded buffers, is scheduled by AudioContext time with a per-change `rate`, compensates its own latency, and its position arithmetic is exactly the model above. Several nodes scheduled at one time align. |
+
+Measured (this repo's e2e harness, Linux x64 desktop, Electron 44): 1000 Hz test beeps played at 60% and 150% measured ≈ 970–1010 Hz (a plain varispeed would give 600/1500 Hz) — pitch is preserved. App CPU during steady playback at 60% speed was **≈ 0.7% of one core with one source and ≈ 1.0% with three loaded sources** (all loaded sources are processed even at zero gain, which keeps stem switching instantaneous). **Not yet verified on a Raspberry Pi 5** (no hardware available); expect a few times higher CPU there. If it proves CPU-bound on ARM, the mitigation is to deactivate silent sources (`active: false`) at the cost of a short warm-up when a stem is switched in, and `configure({ preset: 'cheaper' })`. The worklet module is served as a normal bundled file via `SignalsmithStretch.moduleUrl` (its default is a Blob URL, which our CSP forbids), and the CSP gains `'wasm-unsafe-eval'` (WebAssembly compilation only — no JS `eval`, no `blob:` scripts).
+
+**Spike #41 — alphaTab external media (1.8.4, pinned): findings.**
+
+- Enable with `PlayerMode.EnabledExternalMedia`. `api.player.output` then has `handler` and `updatePosition(ms)` (the types are not exported, so `mp3-playback.ts` declares them locally).
+- Switching modes at runtime works through `updateSettings()`; the handler must be re-attached afterwards because the player is re-created.
+- With no sync points the media→tab mapping is the identity. `score.applyFlatSyncPoints([...])` + `api.updateSyncPoints()` installs anchors; mapping is piecewise-linear in tab time and `api.timePosition` → `handler.seekTo` uses the inverse. `barPosition: 1` (end of a bar) is accepted.
+- alphaTab maps time _after the last anchor_ by stretching the remaining tab over the remaining audio, and before the first by extrapolating the first segment. Our spec wants "continue the last segment's ratio", so `buildSyncMap` always appends a trailing anchor at the end of the tab with that ratio.
+- The cursor is painted on the frame after `updatePosition`, so the ticker reports where the audio _will be_ one half-frame later (8 ms); without that the cursor trails by a speed-dependent amount.
+- Position events arrive every frame in this mode; the store throttles them to ~12 Hz (measure changes and seeks still update immediately).
 
 ### 6.4 Sync model [SYN-1/2/3/5]
 
-- `sync_offset_ms`: mp3 time at bar 1 beat 1.
-- `sync_point(measure, mp3_ms)`: ascending in measure. Between points, tempo is linearly interpolated so measure N lands on `mp3_ms`. Before the first point use the offset; after the last, extrapolate with the last segment's ratio.
-- Conversion functions `measureToMp3Ms` / `mp3MsToMeasure` live in `sync-map.ts`, pure and unit tested (round-trip, monotonicity, negative offset).
-- **Sync editor** (modal in Edit Song): waveform (wavesurfer.js or canvas) + measure list; "Set here" binds the current MP3 playhead to the selected measure; A/B preview plays tab+MP3 from a chosen measure; nudge ±10 ms buttons; validation rejects non-monotonic points.
+- `song.sync_offset_ms`: MP3 time at bar 1. May be negative (audio starting after bar 1), down to −8 s.
+- `sync_point(measure, mp3_ms)` (measure ≥ 2, unique per song, strictly increasing in both measure and time): the MP3 time at the start of that measure. **One map per song, shared by the master and every stem [SYN-5].**
+- `buildSyncMap` (`sync-map.ts`, pure, unit-tested): anchors = (bar 1, offset) + user points + trailing anchor. Between anchors time is interpolated linearly **in tab time**, so tempo changes inside the tab are respected; beyond the ends the nearest segment's ratio continues. `tabMsToMp3Ms`/`mp3MsToTabMs` are inverses and monotonic; `measureToMp3Ms`/`mp3MsToMeasure` serve the editor; `validateSyncPoints` reports out-of-range, duplicate, non-monotonic and past-the-end points. Bar start times in ms come from the MIDI tempo events (`tempo-map.ts`).
+- **Sync editor** (`SyncEditor.tsx`, opened from "Sync audio…" in the player toolbar — it needs the tab and the live engine): canvas waveform (100 peaks/s) with the playhead and a line for every bar at the position the _current_ map gives it (orange = anchored, grey = inferred), click-to-seek, whole-song or 20 s zoom; start-offset field with ±10/±100 ms nudges and "Set to playhead"; "Set bar here" binds the playhead to a chosen bar (bar 1 = offset); per-point time field, ±10 ms, "Set to playhead", delete; validation list that blocks Save; Play/Pause and "Play from bar N" for A/B preview. Every edit is applied to the running engine immediately; Cancel restores the saved values; Save writes offset and points in one transaction (`library.saveSync`).
+- If the master is not the playing source the editor offers "Use the master MP3" (it needs MP3 audio running to show a waveform and play).
 
 ## 7. Preferences [PRF-*]
 
@@ -173,7 +203,9 @@ Dialog sections: Appearance (theme), Locations (library, backup folder), Audio (
 - Integration: migrations from empty and from each prior version; backup→restore round trip.
 - E2E (Playwright-Electron): add song, browse tree, play/loop, preferences theme, backup/restore, about/update (mocked GitHub).
 - Manual checklist per platform for frameless window behavior and audio devices.
-- Fixtures: GP files and tagged MP3s are generated programmatically (`tests/e2e/fixtures.ts`, via alphaTab's exporter and a hand-built ID3v2 tag), so no binary fixtures are checked in. Real audio fixtures for MP3 sync arrive with M4.
+- Fixtures: GP and MIDI files and tag-only MP3s are generated programmatically (`tests/e2e/fixtures.ts`, via alphaTab's exporter/MIDI generator and a hand-built ID3v2 tag). Real audio fixtures — 24 s of 50 ms beeps every 500 ms (120 bpm) at three pitches — are checked in under `tests/fixtures/` (see its README for the ffmpeg command).
+- **Drift test** (`tests/e2e/drift.spec.ts`, SYN-4): a probe on the audio output records each beep as it reaches the listener; a trace of the cursor on the same clock gives the cursor position at that moment; the sync map says where the beep belongs. Real-time drift must stay ≤ 30 ms for: 100%, 60% and 150% speed (and pitch preserved), a start offset with tempo-warping sync points, a speed change mid-play, seeking mid-play, and loop wraps. Beeps within a short window of a deliberate jump are skipped. Observed: 8–23 ms. The probe is only active when the harness sets `TABKING_E2E`.
+- **Manual check** for devices the harness can't cover (Bluetooth or high-latency outputs): play a song with an audible metronome-like recording and confirm the cursor lands on each click; Chromium's `outputLatency` is subtracted but some devices under-report it.
 - Run e2e with `npm run test:e2e` (builds first; needs a display, e.g. `xvfb-run`). Native file dialogs are stubbed from the main process. CI integration lands in M7.
 
 ## 11. Build and release
@@ -231,7 +263,9 @@ SemVer in `package.json`; the phase tag table in PROJECT_PLAN gives each milesto
 
 ## 13. Risks
 
-- alphaTab external-media/backing-track API details differ by version — spike in M4 and pin the version.
-- Pitch-preserving stretch quality/latency for multiple stems; fall back to a single mixed element if CPU-bound on Raspberry Pi.
+- alphaTab's external-media API is version-specific: the version is pinned (1.8.4) and the behaviour above is covered by e2e tests; re-run the drift test when upgrading.
+- Stretch CPU on Raspberry Pi 5 is unmeasured (≈ 1% of a core on a desktop with three sources); see §6.3 for the mitigations if it is CPU-bound.
+- Synth and MP3 audio cannot play together (alphaTab external-media has no synth); a future improvement would run a second synth-only instance following the MP3 clock.
+- Decoded stems are large (~85 MB each for 4 min stereo); a memory budget with eviction keeps this bounded, but very long songs with many stems may need on-demand loading.
 - Frameless resize/drag quirks on some Linux window managers.
 - SoundFont size vs. quality trade-off for installer size.

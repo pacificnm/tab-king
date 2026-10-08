@@ -26,7 +26,9 @@ export function createMainWindow(settings: SettingsStore): BrowserWindow {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
-      webSecurity: true
+      webSecurity: true,
+      // Lets the end-to-end tests ask the renderer for timing diagnostics; off for normal launches.
+      additionalArguments: process.env['TABKING_E2E'] ? ['--tabking-e2e'] : []
     }
   })
 

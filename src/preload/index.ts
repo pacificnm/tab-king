@@ -15,7 +15,8 @@ const api: TabKingApi = {
     }
   },
   app: {
-    getInfo: () => ipcRenderer.invoke(IPC.appGetInfo)
+    getInfo: () => ipcRenderer.invoke(IPC.appGetInfo),
+    diagnostics: process.argv.includes('--tabking-e2e')
   },
   library: {
     listArtists: () => ipcRenderer.invoke(IPC.libListArtists),
@@ -31,6 +32,7 @@ const api: TabKingApi = {
     renameArtist: (id, name) => ipcRenderer.invoke(IPC.libRenameArtist, id, name),
     updateAlbum: (id, title, year) => ipcRenderer.invoke(IPC.libUpdateAlbum, id, title, year),
     saveMix: (songId, mix) => ipcRenderer.invoke(IPC.libSaveMix, songId, mix),
+    saveSync: (songId, sync) => ipcRenderer.invoke(IPC.libSaveSync, songId, sync),
     checkSong: (id) => ipcRenderer.invoke(IPC.libCheckSong, id),
     onChanged: (cb) => {
       const listener = (): void => cb()

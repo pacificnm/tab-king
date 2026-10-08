@@ -9,7 +9,8 @@ import type {
   Result,
   Song,
   SongForm,
-  SongMix
+  SongMix,
+  SongSync
 } from './types'
 
 export { IPC } from './ipc-channels'
@@ -64,16 +65,30 @@ export const SongFormSchema = z.object({
 
 export const SongMixSchema = z.object({
   synthSource: SynthSourceSchema,
+  masterSource: AudioSourceSchema,
   tracks: z
     .array(
       z.object({
         trackIndex: z.number().int().min(0).max(999),
+        source: AudioSourceSchema,
         volume: VolumeSchema,
         muted: z.boolean(),
         solo: z.boolean()
       })
     )
     .max(256)
+})
+
+export const SongSyncSchema = z.object({
+  offsetMs: z.number().int().min(-8000).max(3_600_000),
+  points: z
+    .array(
+      z.object({
+        measure: z.number().int().min(2).max(100_000),
+        mp3Ms: z.number().int().min(0).max(36_000_000)
+      })
+    )
+    .max(10_000)
 })
 
 /** API exposed to the renderer as `window.api`. */
@@ -87,6 +102,8 @@ export interface TabKingApi {
   }
   app: {
     getInfo(): Promise<AppInfo>
+    /** True only when launched by the e2e harness; enables `window.__tabking` timing probes. */
+    readonly diagnostics: boolean
   }
   library: {
     listArtists(): Promise<ArtistRow[]>
@@ -105,6 +122,8 @@ export interface TabKingApi {
     updateAlbum(id: number, title: string, year: number | null): Promise<Result<null>>
     /** Persist the track panel's mix (volume/mute/solo per track, synth source) for a song. */
     saveMix(songId: number, mix: SongMix): Promise<Result<null>>
+    /** Persist the start offset and sync points (shared by the master and all stems). */
+    saveSync(songId: number, sync: SongSync): Promise<Result<null>>
     checkSong(id: number): Promise<FileCheck[]>
     onChanged(cb: () => void): () => void
   }

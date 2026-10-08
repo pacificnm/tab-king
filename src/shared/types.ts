@@ -18,6 +18,13 @@ export interface AlbumRow {
   songCount: number
 }
 
+/** MP3 time at the start of a measure (SYN-2). */
+export interface SyncPointRow {
+  /** 1-based, 2 or more (measure 1 is the song's start offset). */
+  measure: number
+  mp3Ms: number
+}
+
 export interface SongTrack {
   trackIndex: number
   name: string
@@ -47,6 +54,7 @@ export interface Song {
   masterSource: AudioSource
   synthSource: SynthSource
   syncOffsetMs: number
+  syncPoints: SyncPointRow[]
   durationMs: number | null
   tracks: SongTrack[]
 }
@@ -132,6 +140,8 @@ export interface SongForm {
 /** A track's mix state as saved from the track panel. */
 export interface TrackMix {
   trackIndex: number
+  /** Which audio represents this track: the synth or its stem MP3. */
+  source: AudioSource
   volume: number
   muted: boolean
   solo: boolean
@@ -139,7 +149,15 @@ export interface TrackMix {
 
 export interface SongMix {
   synthSource: SynthSource
+  /** Which audio represents the whole band: the synth or the master MP3. */
+  masterSource: AudioSource
   tracks: TrackMix[]
+}
+
+/** Start offset and sync points as saved by the sync editor (SYN-1/2/3). */
+export interface SongSync {
+  offsetMs: number
+  points: SyncPointRow[]
 }
 
 export interface FileCheck {

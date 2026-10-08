@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { libraryUrl } from '@shared/types'
 import { btn, input } from '../../components/Modal'
-import { player, usePlayerStore } from '../../player'
+import { installDiagnostics, player, usePlayerStore } from '../../player'
+import { PAD_MS } from '../../player/mp3-engine'
 import { PlayerEngine } from '../../player/player-engine'
 import { parseSmf, type ParsedSmf } from '../../player/smf'
+import { SyncEditor } from './SyncEditor'
 import { TrackPanel } from './TrackPanel'
 
 const FONT_DIRECTORY = 'tabking://app/font/'
@@ -92,6 +94,21 @@ function RangeControls(): React.JSX.Element {
   )
 }
 
+function SyncButton(): React.JSX.Element | null {
+  const hasAudio = usePlayerStore((s) => s.hasMaster || s.tracks.some((t) => t.hasMp3))
+  const ready = usePlayerStore((s) => s.status === 'ready')
+  const [open, setOpen] = useState(false)
+  if (!hasAudio) return null
+  return (
+    <>
+      <button type="button" className={btn} disabled={!ready} onClick={() => setOpen(true)}>
+        Sync audio…
+      </button>
+      {open && <SyncEditor onClose={() => setOpen(false)} />}
+    </>
+  )
+}
+
 function ViewControls(): React.JSX.Element {
   const zoom = usePlayerStore((s) => s.zoom)
   const layout = usePlayerStore((s) => s.layout)
@@ -143,6 +160,7 @@ export default function TabView(): React.JSX.Element {
     const e = new PlayerEngine(container.current, scroller.current, FONT_DIRECTORY, SOUNDFONT_URL)
     engine.current = e
     player.attach(e)
+    if (window.api.app.diagnostics) installDiagnostics(PAD_MS)
     return () => {
       player.detach(e)
       engine.current = null
@@ -184,7 +202,20 @@ export default function TabView(): React.JSX.Element {
           }
         }
         if (cancelled) return
-        e.load(bytes, { mix: song.tracks, synthSource: song.synthSource, midi })
+        e.load(bytes, {
+          mix: song.tracks,
+          synthSource: song.synthSource,
+          midi,
+          masterSource: song.masterSource,
+          masterUrl: song.masterMp3Path ? libraryUrl(song.masterMp3Path) : null,
+          stemUrls: new Map(
+            song.tracks.flatMap((t) =>
+              t.mp3Path ? [[t.trackIndex, libraryUrl(t.mp3Path)] as const] : []
+            )
+          ),
+          syncOffsetMs: song.syncOffsetMs,
+          syncPoints: song.syncPoints
+        })
         usePlayerStore.setState({ midiError })
       } catch (err) {
         if (!cancelled) player.fail(err instanceof Error ? err.message : String(err))
@@ -204,6 +235,7 @@ export default function TabView(): React.JSX.Element {
         </div>
         <RangeControls />
         <ViewControls />
+        <SyncButton />
       </div>
       {error && (
         <p role="alert" className="border-b border-danger px-4 py-2 text-sm text-danger">

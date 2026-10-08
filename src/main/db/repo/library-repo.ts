@@ -1,5 +1,13 @@
 import type { Db } from '../connection'
-import type { AlbumRow, ArtistRow, Song, SongInput, SongMix, SongTrack } from '@shared/types'
+import type {
+  AlbumRow,
+  ArtistRow,
+  Song,
+  SongInput,
+  SongMix,
+  SongSync,
+  SongTrack
+} from '@shared/types'
 
 interface SongDbRow {
   id: number
@@ -231,12 +239,27 @@ export class LibraryRepo {
   /** Save the track panel's mix. Only touches existing track rows, so it is safe against a concurrent edit. */
   saveMix(songId: number, mix: SongMix): void {
     this.db.transaction(() => {
-      this.db.prepare('UPDATE song SET synth_source = ? WHERE id = ?').run(mix.synthSource, songId)
+      this.db
+        .prepare('UPDATE song SET synth_source = ?, master_source = ? WHERE id = ?')
+        .run(mix.synthSource, mix.masterSource, songId)
       const upd = this.db.prepare(
-        'UPDATE song_track SET volume = ?, muted = ?, solo = ? WHERE song_id = ? AND track_index = ?'
+        'UPDATE song_track SET source = ?, volume = ?, muted = ?, solo = ? WHERE song_id = ? AND track_index = ?'
       )
-      for (const t of mix.tracks)
-        upd.run(t.volume, t.muted ? 1 : 0, t.solo ? 1 : 0, songId, t.trackIndex)
+      for (const t of mix.tracks) {
+        upd.run(t.source, t.volume, t.muted ? 1 : 0, t.solo ? 1 : 0, songId, t.trackIndex)
+      }
+    })()
+  }
+
+  /** Save the start offset and replace the song's sync points in one transaction. */
+  saveSync(songId: number, sync: SongSync): void {
+    this.db.transaction(() => {
+      this.db.prepare('UPDATE song SET sync_offset_ms = ? WHERE id = ?').run(sync.offsetMs, songId)
+      this.db.prepare('DELETE FROM sync_point WHERE song_id = ?').run(songId)
+      const ins = this.db.prepare(
+        'INSERT INTO sync_point (song_id, measure, mp3_ms) VALUES (?,?,?)'
+      )
+      for (const p of sync.points) ins.run(songId, p.measure, p.mp3Ms)
     })()
   }
 
@@ -336,6 +359,14 @@ export class LibraryRepo {
       masterSource: r.master_source,
       synthSource: r.synth_source,
       syncOffsetMs: r.sync_offset_ms,
+      syncPoints: this.db
+        .prepare(
+          'SELECT measure, mp3_ms AS mp3Ms FROM sync_point WHERE song_id = ? ORDER BY measure'
+        )
+        .all(r.id) as {
+        measure: number
+        mp3Ms: number
+      }[],
       durationMs: r.duration_ms,
       tracks
     }

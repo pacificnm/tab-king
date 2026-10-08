@@ -21,5 +21,6 @@ export const IPC = {
   libUpdateAlbum: 'lib:update-album',
   libCheckSong: 'lib:check-song',
   libSaveMix: 'lib:save-mix',
+  libSaveSync: 'lib:save-sync',
   libChanged: 'lib:changed'
 } as const

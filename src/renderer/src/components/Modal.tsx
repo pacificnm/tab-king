@@ -6,10 +6,12 @@ interface Props {
   onClose: () => void
   children: ReactNode
   wide?: boolean
+  /** Extra-wide dialog for content like waveforms. */
+  xl?: boolean
 }
 
 /** Modal dialog below the title bar: backdrop, focus trap, Esc to close. */
-export function Modal({ title, onClose, children, wide }: Props): React.JSX.Element {
+export function Modal({ title, onClose, children, wide, xl }: Props): React.JSX.Element {
   const panel = useRef<HTMLDivElement>(null)
   const titleId = useId()
   useFocusTrap(panel, true, onClose)
@@ -20,7 +22,7 @@ export function Modal({ title, onClose, children, wide }: Props): React.JSX.Elem
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className={`flex max-h-full w-full flex-col rounded-lg border border-border bg-surface shadow-2xl ${wide ? 'max-w-2xl' : 'max-w-md'}`}
+        className={`flex max-h-full w-full flex-col rounded-lg border border-border bg-surface shadow-2xl ${xl ? 'max-w-5xl' : wide ? 'max-w-2xl' : 'max-w-md'}`}
       >
         <h2 id={titleId} className="border-b border-border px-5 py-3 text-base font-semibold">
           {title}
