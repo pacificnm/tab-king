@@ -32,7 +32,7 @@ Baseline tag `v0.0.0` marks the docs-only starting point.
 
 ### M0 — Scaffold & Shell (v0.1.0)
 
-Scaffold electron-vite + React + TS; Tailwind with theme tokens; lint/format/test tooling; CI; **electron-builder config and tag-triggered release workflow building every OS/arch (SPECS §11)**; secure window baseline (preload, CSP); frameless window with custom title bar and controls; resize handling; title-bar File/Help menu bar; left hamburger nav flyout (Play Lists, Favorites, Artists); persisted window bounds.
+Scaffold electron-vite + React + TS; Tailwind with theme tokens; lint/format/test tooling; CI; **electron-builder config and tag-triggered release workflow building every OS/arch (SPECS §11)**; secure window baseline (preload, CSP); frameless window with custom title bar and controls; resize handling; title-bar File/Help menu bar; left hamburger nav flyout (Search, Play Lists, Favorites, Artists); persisted window bounds.
 **Accept:** app launches on Linux; nav flyout and File/Help menus open/close; CI green; pushing `v0.1.0` produces a GitHub Release with Linux x64/arm64, Windows, macOS x64/arm64 installers. Covers WIN-1…5, NFR-4 (baseline), NFR-7.
 
 ### M1 — Library (v0.2.0)
