@@ -1,6 +1,6 @@
 {
   "name": "tab-king",
-  "version": "0.7.0",
+  "version": "1.0.0",
   "description": "Desktop guitar tab player with Guitar Pro playback and synced MP3 tracks",
   "author": "Jaimie Garner <pacificnm@gmail.com>",
   "license": "Apache-2.0",
@@ -19,6 +19,7 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "license:check": "node scripts/check-licenses.mjs",
     "test": "vitest run",
     "dist": "npm run build && electron-builder --publish never",
     "dist:dir": "npm run build && electron-builder --dir --publish never",
@@ -35,6 +36,7 @@
     "@types/yauzl": "^3.4.0",
     "@types/yazl": "^3.3.1",
     "@vitejs/plugin-react": "^5.2.0",
+    "axe-core": "^4.14.0",
     "electron": "^44.7.0",
     "electron-builder": "^26.15.3",
     "electron-vite": "^5.0.0",

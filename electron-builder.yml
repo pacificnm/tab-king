@@ -19,6 +19,11 @@ linux:
   icon: build/icon.png
   maintainer: Jaimie Garner <pacificnm@gmail.com>
   synopsis: Guitar tab player
+  desktop:
+    entry:
+      Name: Tab King
+      Comment: Guitar tab player with synced MP3 audio
+      Keywords: guitar;tab;tablature;guitar pro;music;
 deb:
   depends:
     [
@@ -35,10 +40,17 @@ deb:
 win:
   target: [nsis, portable]
   icon: build/icon.png
+# NSIS and portable share the platform/arch, so the portable build gets its own file name.
+portable:
+  artifactName: tab-king-${version}-${os}-${arch}-portable.${ext}
 nsis:
   oneClick: false
   perMachine: false
   allowToChangeInstallationDirectory: true
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  shortcutName: Tab King
+  uninstallDisplayName: Tab King
 mac:
   target: [dmg, zip]
   category: public.app-category.music

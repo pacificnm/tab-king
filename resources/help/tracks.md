@@ -3,7 +3,7 @@
 Every Guitar Pro track appears in the **Tracks** panel with its instrument.
 
 - **Solo** plays only that track; **Mute** silences it; the slider sets its volume.
-- A track's **Practice** button shows and plays just that track; press it again to return to the full score and mix.
+- A track's **Practice this track** button shows and plays just that track; press it again to return to the full score and mix.
 - **Volume** in the footer sets the overall level.
 
 Your mix is remembered for each song.

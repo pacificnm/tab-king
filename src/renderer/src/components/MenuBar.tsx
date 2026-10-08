@@ -135,6 +135,9 @@ export function MenuBar({ onSelect }: Props): React.JSX.Element {
                     onKeyDown={(e) => onItemKey(e, mi)}
                     onClick={() => {
                       setOpen(null)
+                      // The item is about to unmount: park focus on the menu button so a dialog opened from here
+                      // can give focus back to something real when it closes.
+                      root.current?.querySelector<HTMLElement>(`[data-menu="${m.id}"]`)?.focus()
                       onSelect(item.id)
                     }}
                   >

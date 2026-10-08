@@ -24,7 +24,7 @@ export async function launchApp(
   const app = await electron.launch(
     exe
       ? { executablePath: exe, args: ['--no-sandbox', userData], env }
-      : { args: ['out/main/index.js', userData], env }
+      : { args: ['out/main/index.js', userData, ...(process.env.CI ? ['--no-sandbox'] : [])], env }
   )
   return { app, page: await app.firstWindow() }
 }
@@ -103,4 +103,19 @@ export async function addAudioSong(
   }
   await dialog.getByRole('button', { name: 'Add song' }).click()
   await expect(page.getByRole('article', { name: 'Master' })).toBeVisible()
+}
+
+/** Close the app, and kill it if it hasn't exited within 10 s (a hung exit must not hang the whole run). */
+export async function closeApp(app: ElectronApplication): Promise<void> {
+  const proc = app.process()
+  const exited = new Promise<void>((resolve) => proc.once('exit', () => resolve()))
+  await Promise.race([
+    app.close().catch(() => undefined),
+    new Promise<void>((resolve) => setTimeout(resolve, 10_000))
+  ])
+  if (proc.exitCode === null) {
+    console.log('app did not exit after close(); killing it')
+    proc.kill()
+    await Promise.race([exited, new Promise<void>((resolve) => setTimeout(resolve, 5_000))])
+  }
 }

@@ -43,12 +43,11 @@ test('master and stems: each track plays alone from its stem and the full mix re
 
   for (const name of ['Lead', 'Bass']) {
     await panel()
-      .getByRole('button', { name: `Practice ${name}` })
+      .getByRole('button', { name: `Practice this track: ${name}` })
       .click()
-    await expect(panel().getByRole('button', { name: `Practice ${name}` })).toHaveAttribute(
-      'aria-pressed',
-      'true'
-    )
+    await expect(
+      panel().getByRole('button', { name: `Practice this track: ${name}` })
+    ).toHaveAttribute('aria-pressed', 'true')
     await expect(engine()).toHaveText('Audio: MP3') // the stem, not the synth
     await expect(panel().getByRole('alert')).toHaveCount(0)
     await footer().getByRole('button', { name: 'Play' }).click()

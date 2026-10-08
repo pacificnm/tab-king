@@ -197,12 +197,12 @@ export function TrackPanel(): React.JSX.Element {
                   <button
                     type="button"
                     className={`${btn} mt-2 w-full !py-1 text-xs ${practiced ? '!border-accent !bg-accent !text-accent-fg' : ''}`}
-                    aria-label={`Practice ${t.name}`}
+                    aria-label={`Practice this track: ${t.name}`}
                     aria-pressed={practiced}
                     disabled={!ready}
                     onClick={() => player.setPractice(practiced ? null : t.index)}
                   >
-                    {practiced ? 'Practicing this track' : 'Practice this track'}
+                    Practice this track
                   </button>
                 </li>
               )

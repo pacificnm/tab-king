@@ -76,14 +76,9 @@ export function SongDetail({
             <button type="button" className={btn} onClick={() => onAddToPlaylist(song)}>
               Add to play list…
             </button>
-            <button
-              type="button"
-              className={btn}
-              aria-pressed={song.favorite}
-              aria-label={song.favorite ? 'Remove from favorites' : 'Add to favorites'}
-              onClick={() => onToggleFavorite(song)}
-            >
-              {song.favorite ? '♥ Favorite' : '♡ Favorite'}
+            <button type="button" className={btn} onClick={() => onToggleFavorite(song)}>
+              <span aria-hidden="true">{song.favorite ? '♥' : '♡'} </span>
+              {song.favorite ? 'Remove from favorites' : 'Add to favorites'}
             </button>
             <button type="button" className={btn} onClick={() => onDelete(song)}>
               Delete
