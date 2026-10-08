@@ -18,10 +18,14 @@ test.beforeEach(async () => {
   tmp = mkdtempSync(join(tmpdir(), 'tabking-e2e-'))
   const env = { ...process.env } as Record<string, string>
   delete env.ELECTRON_RUN_AS_NODE
-  app = await electron.launch({
-    args: ['out/main/index.js', `--user-data-dir=${join(tmp, 'ud')}`],
-    env
-  })
+  const userData = `--user-data-dir=${join(tmp, 'ud')}`
+  // TABKING_EXE runs the suite against a packaged build (npm run dist:dir) instead of out/main.
+  const exe = process.env.TABKING_EXE
+  app = await electron.launch(
+    exe
+      ? { executablePath: exe, args: ['--no-sandbox', userData], env }
+      : { args: ['out/main/index.js', userData], env }
+  )
   page = await app.firstWindow()
 })
 
