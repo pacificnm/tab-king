@@ -1,0 +1,111 @@
+name: Release
+
+# Push a tag like v0.1.0 (matching package.json) to build every platform and publish a GitHub Release.
+# Run manually (workflow_dispatch) for a dry run: builds and uploads artifacts, publishes nothing.
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        name: Check version and changelog
+        run: |
+          version=$(node -p "require('./package.json').version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            if [ "$GITHUB_REF_NAME" != "v$version" ]; then
+              echo "::error::Tag $GITHUB_REF_NAME does not match package.json version v$version"
+              exit 1
+            fi
+            if ! grep -qE "^## \[?$version\]?( |$)" CHANGELOG.md; then
+              echo "::error::CHANGELOG.md has no section for $version"
+              exit 1
+            fi
+          fi
+
+  build:
+    needs: verify
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: linux-x64, os: ubuntu-24.04, args: --linux --x64 }
+          - { name: linux-arm64, os: ubuntu-24.04-arm, args: --linux --arm64 }
+          - { name: windows-x64, os: windows-latest, args: --win --x64 }
+          - { name: macos-x64, os: macos-15-intel, args: --mac --x64 }
+          - { name: macos-arm64, os: macos-latest, args: --mac --arm64 }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - name: Package
+        run: npx electron-builder ${{ matrix.args }} --publish never
+        env:
+          # Optional signing secrets; unsigned builds are produced when these are unset.
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tab-king-${{ matrix.name }}
+          if-no-files-found: error
+          path: |
+            release/*.AppImage
+            release/*.deb
+            release/*.exe
+            release/*.dmg
+            release/*.zip
+
+  release:
+    needs: [verify, build]
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Checksums
+        working-directory: dist
+        run: sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
+      - name: Release notes from CHANGELOG
+        run: |
+          v='${{ needs.verify.outputs.version }}'
+          awk -v v="$v" '
+            $0 ~ "^## \\[?" v "\\]?( |$)" { on=1; next }
+            on && /^## / { exit }
+            on { print }
+          ' CHANGELOG.md > notes.md
+          [ -s notes.md ] || echo "Release $v" > notes.md
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          flags=""
+          case "$GITHUB_REF_NAME" in *-*) flags="--prerelease" ;; esac
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --verify-tag --title "Tab King $GITHUB_REF_NAME" --notes-file notes.md $flags
