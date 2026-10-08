@@ -61,12 +61,11 @@ test('each track plays alone and the full mix returns', async () => {
     [2, 'Bass', [1, 'Lead']]
   ] as const) {
     await panel()
-      .getByRole('button', { name: `Practice ${name}` })
+      .getByRole('button', { name: `Practice this track: ${name}` })
       .click()
-    await expect(panel().getByRole('button', { name: `Practice ${name}` })).toHaveAttribute(
-      'aria-pressed',
-      'true'
-    )
+    await expect(
+      panel().getByRole('button', { name: `Practice this track: ${name}` })
+    ).toHaveAttribute('aria-pressed', 'true')
     await audible(n, name) // even a muted track is heard when practiced alone
     await faded(other[0], other[1])
     await expect(panel().getByRole('button', { name: 'Back to full mix' })).toBeVisible()
