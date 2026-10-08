@@ -15,6 +15,7 @@ All notable changes to Tab King. Format: [Keep a Changelog](https://keepachangel
 
 ### Changed
 
+- Large lists (favorites, play lists, an artist's songs) load about 8× faster: each song's tracks and sync points are now fetched in batches rather than two queries per song.
 - Double-clicking a song in the tree now plays it (the flyout stays open for 300 ms after a click so the second click lands on the same row).
 - Toggling a favorite from the tree's menu no longer closes the flyout.
 - Playing a single song queues its album so playback carries on through it.
